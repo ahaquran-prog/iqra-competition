@@ -23,6 +23,7 @@ const out = esbuild.buildSync({
   loader: { '.wasm': 'binary', '.db': 'binary' },
   define: { __dirname: '"/app"', 'require.main': 'undefined' },
   banner: { js: 'globalThis.process=globalThis.process||{env:{},argv:[],platform:"browser"};if(!Number.prototype.unref)Object.defineProperty(Number.prototype,"unref",{value:function(){return this}});' },
+  external: ['nodemailer'], // البريد لا يعمل داخل المتصفح
   logLevel: 'warning',
 });
 const bundle = out.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');

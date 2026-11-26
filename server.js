@@ -78,11 +78,12 @@ app.post('/api/signup', wrap((req, res) => {
   if (name.split(' ').length < 3 || name.length > 120) throw new Bad('اكتب الاسم الرباعي كاملًا كما في الهوية');
   const phone = R.normPhone(b.phone); if (!phone) throw new Bad('رقم الهاتف غير صحيح (من 7 إلى 15 رقمًا)');
   const p = auth.passwordProblem(b.password); if (p) throw new Bad(p);
+  const email = str(b.email, 120, 'البريد', false); if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Bad('البريد الإلكتروني غير صحيح');
   if (db.prepare('SELECT 1 FROM users WHERE login=?').get(nid) || db.prepare('SELECT 1 FROM people WHERE national_id=?').get(nid))
     throw new Bad('يوجد حساب بهذا الرقم. سجّل الدخول، أو تواصل مع الإدارة التنفيذية لاستعادة الحساب.', 409);
   const now = Date.now();
   const uid = db.transaction(() => {
-    const id = db.prepare("INSERT INTO users(login,name,phone,role,pass_hash,created_at) VALUES (?,?,?,'contestant',?,?)").run(nid, name, phone, auth.hashPassword(b.password), now).lastInsertRowid;
+    const id = db.prepare("INSERT INTO users(login,name,phone,email,role,pass_hash,created_at) VALUES (?,?,?,?,'contestant',?,?)").run(nid, name, phone, email, auth.hashPassword(b.password), now).lastInsertRowid;
     const pid = db.prepare('INSERT INTO people(user_id,national_id,full_name,phone,created_at,updated_at) VALUES (?,?,?,?,?,?)').run(id, nid, name, phone, now, now).lastInsertRowid;
     audit({ id }, 'signup', 'person', pid, { summary: 'إنشاء حساب متسابق' });
     return id;
@@ -209,7 +210,7 @@ app.get('/api/my', onlyContestant, wrap((req) => {
   const r = c ? db.prepare(regSelect + ' WHERE r.comp_id=? AND r.person_id=?').get(c.id, p.id) : null;
   const st = R.regState(c);
   return {
-    person: { nationalId: p.national_id, fullName: p.full_name, phone: p.phone, phone2: p.phone2, birthYear: p.birth_year, gender: p.gender },
+    person: { nationalId: p.national_id, fullName: p.full_name, phone: p.phone, phone2: p.phone2, email: req.user.email, birthYear: p.birth_year, gender: p.gender },
     competition: c ? compJson(c) : null,
     registration: r ? regJson(r) : null,
     canRegister: !r && st.open,
@@ -250,6 +251,7 @@ app.post('/api/my/registration', onlyContestant, wrap((req) => {
     chosen.push({ branch: br.code, branchName: br.name, track: tr.track, trackName: tr.trackName, curriculumId: tr.curriculumId, curriculum: tr.content });
   }
   const now = Date.now(), section = b.gender;
+  let created = false;
   const out = db.transaction(() => {
     const before = { ...p };
     db.prepare('UPDATE people SET birth_year=?, gender=?, phone2=?, updated_at=? WHERE id=?').run(year, b.gender, phone2, now, p.id);
@@ -260,6 +262,7 @@ app.post('/api/my/registration', onlyContestant, wrap((req) => {
       for (const e of chosen) db.prepare(`INSERT INTO entries(registration_id,branch,branch_name,track,track_name,curriculum_id,curriculum_text,status,created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,'active',?,?)`).run(rid, e.branch, e.branchName, e.track, e.trackName, e.curriculumId, e.curriculum, now, now);
       audit(req.user, 'register', 'registration', rid, { section, summary: 'التسجيل في: ' + chosen.map((e) => e.branchName).join('، '), after: { category: cat.category.name, entries: chosen } });
+      created = true;
       return rid;
     }
     // تسجيل قائم: التعديل ضمن موعد التعديل وقبل تثبيت أي حضور
@@ -278,6 +281,7 @@ app.post('/api/my/registration', onlyContestant, wrap((req) => {
     audit(req.user, 'edit', 'registration', r.id, { section, summary: 'تعديل التسجيل من المتسابق', before: { birthYear: before.birth_year, gender: before.gender, category: r.category_name, entries: old }, after: { birthYear: year, gender: b.gender, category: cat.category.name, entries: chosen } });
     return r.id;
   })();
+  if (created) require('./lib/notify').events.registered(req.user.id, out, c.name, cat.category.name, chosen.map((e) => e.branchName + (e.trackName ? ' (' + e.trackName + ')' : '')));
   return { registration: regJson(db.prepare(regSelect + ' WHERE r.id=?').get(out)) };
 }));
 
@@ -296,9 +300,10 @@ app.patch('/api/my/profile', onlyContestant, wrap((req) => {
   const p = myPerson(req.user), b = req.body || {};
   const phone = R.normPhone(b.phone); if (!phone) throw new Bad('رقم الهاتف الأساسي غير صحيح');
   let phone2 = ''; if (String(b.phone2 || '').trim()) { phone2 = R.normPhone(b.phone2); if (!phone2) throw new Bad('رقم الهاتف الآخر غير صحيح'); }
+  const email = str(b.email, 120, 'البريد', false); if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Bad('البريد الإلكتروني غير صحيح');
   db.transaction(() => {
     db.prepare('UPDATE people SET phone=?, phone2=?, updated_at=? WHERE id=?').run(phone, phone2, Date.now(), p.id);
-    db.prepare('UPDATE users SET phone=? WHERE id=?').run(phone, req.user.id);
+    db.prepare('UPDATE users SET phone=?, email=? WHERE id=?').run(phone, email, req.user.id);
     audit(req.user, 'profile', 'person', p.id, { summary: 'تحديث أرقام التواصل', before: { phone: p.phone, phone2: p.phone2 }, after: { phone, phone2 } });
   })();
   return { ok: true };
@@ -548,6 +553,9 @@ require('./lib/field')(app);
 require('./lib/judging')(app);
 // اختبار التفسير الإلكتروني
 require('./lib/tests')(app);
+// الإشعارات ومواعيد المراحل
+const N = require('./lib/notify');
+N.routes(app);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'غير موجود' }));
 

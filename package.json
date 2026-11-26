@@ -10,10 +10,13 @@
     "backup": "node scripts/backup.js",
     "test": "node scripts/test.js"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.2.0",
-    "express": "^4.22.3"
+    "express": "^4.22.3",
+    "nodemailer": "^6.10.1"
   }
 }

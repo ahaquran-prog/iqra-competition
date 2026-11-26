@@ -305,3 +305,11 @@ tr.pend td{background:#fffaf0}
 .note.bad{color:var(--bad)}
 .bank{padding-inline-start:20px}.bank>li{padding:10px 0;border-bottom:1px solid var(--line)}
 .bank ul{margin:4px 0 8px;padding-inline-start:18px}.bank li.right{color:var(--ok);font-weight:700}
+
+/* الإشعارات */
+.bell{position:relative;display:inline-grid;place-items:center;width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.12);text-decoration:none;color:#fff}
+.bell b{position:absolute;top:-6px;inset-inline-end:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--gold);color:#241a30;font:700 12px/20px "IBM Plex Sans Arabic";text-align:center}
+.inbox{list-style:none;margin:0;padding:0}
+.inbox li{padding:14px 0;border-bottom:1px solid var(--line)}.inbox li:last-child{border-bottom:0}
+.inbox li.new{background:linear-gradient(90deg,transparent,var(--soft));padding-inline:10px;border-radius:8px}
+.inbox p{margin:6px 0}

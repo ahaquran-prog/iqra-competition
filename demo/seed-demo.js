@@ -80,6 +80,10 @@ function client(base) {
     const r = await c('POST', '/api/my/registration', { birthYear: year, gender: g, entries: entries.map(([branch, track]) => ({ branch, track })) });
     if (status === 'withdrawn') await c('POST', '/api/my/withdraw', { reason: 'ظرف عائلي' });
   }
+  // المواعيد: التصفيات اليوم في القسمين، وقبل النهائي بعد يومين
+  const day = (d, h) => { const t = new Date(); t.setDate(t.getDate() + d); t.setHours(h, 0, 0, 0); return t.getTime(); };
+  await mgr.M('POST', '/api/sessions', { stage: 'prelim', branch: '', startsAt: day(0, 16), location: 'مقر جمعية اقرأ — قاعات التصفيات', note: 'يرجى الحضور قبل الموعد بنصف ساعة مع الهوية' });
+  await mgr.F('POST', '/api/sessions', { stage: 'prelim', branch: '', startsAt: day(0, 16), location: 'مقر جمعية اقرأ — قسم النساء' });
   // اللجان: تكليف المحكمين والمنسق، ثم حضور معظم المقبولين وبعض النداءات
   const adm = client(base); await adm('POST', '/api/login', { login: 'admin', password: PASS });
   const uid = (l) => db.prepare('SELECT id FROM users WHERE login=?').get(l).id;
@@ -151,12 +155,14 @@ function client(base) {
     const pv = await chief('POST', '/api/qualify/preview', { stage: 'prelim', groupKey: g.key, mode: 'count', value: 1 });
     await chief('POST', '/api/qualify/approve', { stage: 'prelim', groupKey: g.key, mode: 'count', value: 1, decisions: pv.tie ? pv.rows.filter((r) => r.tieAtCut).map((r, k) => ({ entryId: r.entryId, qualified: k === 0, reason: 'قرار اللجنة' })) : [] });
   }
+  for (const g of (await chief('GET', '/api/results?branch=tilawa')).groups.filter((g) => g.sheet && !g.sheet.stale)) await adm('POST', '/api/results/publish', { sheetId: g.sheet.id });
   const sp = (await adm('GET', '/api/admin/stage-passages')).rows;
   const SEMI = { 'ترتيل · اليافعون': [43, 8, 14], 'ترتيل · الشباب': [29, 7, 12], 'ترتيل · الكبار': [28, 6, 10], 'تدوير · اليافعون': [50, 16, 30], 'تدوير · الشباب': [33, 7, 12], 'تدوير · الكبار': [27, 14, 26] };
   await adm('PUT', '/api/admin/stage-passages', { rows: sp.map((x) => { const p = SEMI[x.name]; return { id: x.id, semi: p ? { surah: p[0], ayahFrom: p[1], ayahTo: p[2] } : null }; }) });
   const semiT = (await mgr.M('GET', '/api/committees?stage=semi')).committees.find((k) => k.name.includes('التدوير'));
   for (const l of ['judge.t1', 'judge.t2', 'judge.t3', 'judge.t4', 'judge.t5']) await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid(l), kind: 'judge' });
   await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid('coord.m'), kind: 'coordinator' });
+  await mgr.M('POST', '/api/sessions', { stage: 'semi', branch: 'tilawa', startsAt: day(2, 17), location: 'مقر جمعية اقرأ — القاعة الرئيسية' });
   const rs = await mgr.M('GET', '/api/reception?stage=semi');
   for (const r of rs.rows) await mgr.M('POST', '/api/checkin', { registrationId: r.id, stage: 'semi', items: r.entries.map((e) => ({ entryId: e.id })) });
   // اختبارات التفسير: أسئلة تجريبية للعرض فقط، وليست بنك الأسئلة المعتمد
