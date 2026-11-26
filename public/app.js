@@ -43,11 +43,12 @@ function pwBox(title, login, pass) {
 const NAV = {
   public: [['home', 'تعريف المسابقة'], ['login', 'تسجيل الدخول'], ['signup', 'إنشاء حساب متسابق']],
   contestant: [['my', 'مشاركتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  judge: [['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  coordinator: [['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  chief: [['regs', 'التسجيلات (اطلاع)'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  exec: [['dash', 'لوحة القسم'], ['regs', 'التسجيلات'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  top: [['dash', 'لوحة المتابعة'], ['regs', 'التسجيلات'], ['setup', 'إعداد الدورة'], ['users', 'الحسابات'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  judge: [['space', 'مساحتي'], ['queues', 'طابور لجنتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  coordinator: [['queues', 'النداء'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  chief: [['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'التسجيلات (اطلاع)'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  exec: [['dash', 'لوحة القسم'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'التسجيلات'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  top: [['dash', 'لوحة المتابعة'], ['regs', 'التسجيلات'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['setup', 'إعداد الدورة'], ['users', 'الحسابات'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  screen: [['screen', 'شاشة الانتظار']],
 };
 const navFor = () => NAV[me ? me.role : 'public'];
 const homeOf = () => navFor()[0][0];
@@ -57,6 +58,8 @@ function route() {
   if (h === 'view') { $('#view').focus(); history.replaceState(null, '', '#' + view); return; }
   const allowed = navFor().map((x) => x[0]);
   view = allowed.includes(h) ? h : homeOf();
+  stopPoll(); document.body.classList.toggle('screen-mode', view === 'screen');
+  if (view === 'screen') { SCR.first = true; SCR.last = 0; }
   render(); scrollTo(0, 0);
 }
 addEventListener('hashchange', route);
@@ -66,6 +69,11 @@ function shell() {
   $('#who').innerHTML = me ? `<span class="chip">${esc(me.name)} · <b>${esc(me.roleName)}</b>${me.sectionName && me.role !== 'contestant' ? ' · ' + esc(me.sectionName) : ''}</span><button class="btn sm ghost" data-act="logout">خروج</button>`
     : `<a class="btn sm gold" href="#login">تسجيل الدخول</a>`;
 }
+// تحديث دوري للطوابير والشاشة ومتابعة المتسابق
+let pollT = null;
+function stopPoll() { clearInterval(pollT); pollT = null; }
+function startPoll(ms, fn) { stopPoll(); pollT = setInterval(() => { if (!dlg.open && !document.hidden) fn(); }, ms); }
+async function repaint() { const v = $('#view'), y = scrollY; try { v.innerHTML = await VIEWS[view](); afterRender(v); scrollTo(0, y); } catch (e) {} }
 async function render() {
   shell();
   const v = $('#view');
@@ -157,14 +165,21 @@ const vAccount = () => `<div class="grid2"><div class="card"><h2>حسابي</h2>
   ${me.role !== 'contestant' ? `<dt>القسم</dt><dd>${esc(me.sectionName || '—')}</dd>` : ''}${me.specialty ? `<dt>التخصص</dt><dd>${esc(me.specialty)}</dd>` : ''}<dt>آخر دخول</dt><dd>${esc(fmt(me.lastLogin) || '—')}</dd></dl></div>${vPassword(false).replace('auth card', 'card')}</div>`;
 
 // ---------- مساحة المحكم والمنسق ورئيس التحكيم ----------
-const vSpace = () => `<div class="head"><div><h1>مساحتي</h1><p>${esc(me.roleName)} · ${esc(me.sectionName)}${me.specialty ? ' · ' + esc(me.specialty) : ''}</p></div></div>
-  <div class="card"><h2>التكليف والتحكيم</h2><p>حسابك مرتبط بـ${esc(me.sectionName)}، ولا يطّلع على بيانات القسم الآخر.</p>
-  <p>تُفعَّل في التسليم القادم: التكليف باللجان والمراحل، وطوابير اللجنة والنداء، واستمارات التحكيم المستقلة. حتى ذلك الحين لا تُعرض في حسابك بيانات المتسابقين${me.role === 'chief' ? ' إلا قائمة التسجيلات للاطلاع' : ''}.</p>
-  ${me.role === 'chief' ? '<a class="btn pri" href="#regs">قائمة التسجيلات</a>' : ''}</div>`;
+async function vSpace() {
+  const { committees } = await api('/committees');
+  return `<div class="head"><div><h1>مساحتي</h1><p>${esc(me.roleName)} · ${esc(me.sectionName)}${me.specialty ? ' · ' + esc(me.specialty) : ''}</p></div></div>
+  <div class="card"><h2>تكليفي</h2>${committees.length ? committees.map((c) => `<div class="entry"><b>${esc(c.name)}</b><span class="tag">${esc(c.hall || '—')}</span>
+    <span class="cur">${esc(c.stageName)} · ${c.members.filter((m) => m.userId === me.id).map((m) => (m.kind === 'judge' ? 'محكم' : 'منسق النداء')).join('، ')}</span></div>`).join('')
+    : '<p class="note">لم تُكلَّف بلجنة بعد. تكلّفك الإدارة التنفيذية لقسمك من صفحة «اللجان».</p>'}
+  ${committees.length ? `<div class="acts"><a class="btn pri" href="#queues">${me.role === 'coordinator' ? 'فتح شاشة النداء' : 'طابور لجنتي'}</a></div>` : ''}</div>
+  ${me.role === 'judge' ? '<div class="card"><h2>رصد الدرجات</h2><p class="note">استمارات التحكيم بالخصومات تُفعَّل في الخطوة القادمة. ستظهر لك استمارة تخصصك للمتسابق الجاري في لجنتك.</p></div>' : ''}`;
+}
 
 // ---------- المتسابق: مشاركتي ومعالج التسجيل ----------
 async function vMy() {
   S.my = await api('/my');
+  S.myQ = S.my.registration ? (await api('/my/queue')).tickets : [];
+  if (S.myQ.some((t) => ['waiting', 'called', 'testing', 'needs_committee'].includes(t.status))) startPoll(10000, repaint); else stopPoll();
   const m = S.my, c = m.competition;
   if (!c) return `<div class="card empty"><h2>لا توجد دورة حالية</h2></div>`;
   if (S.wz) return wizard();
@@ -182,13 +197,19 @@ async function vMy() {
   <div class="grid2"><div class="card"><div class="status"><span class="big">${esc(r.statusName)}</span>${stTag(r.status)}</div>
     <p class="note">قُدّم الطلب ${esc(fmt(r.createdAt))}${r.updatedAt !== r.createdAt ? ' · آخر تحديث ' + esc(fmt(r.updatedAt)) : ''}</p>
     <h3>مشاركاتي (${active.length})</h3>
-    ${active.map((e) => `<div class="entry"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b><span class="tag">موعد المرحلة: بانتظار الإعلان</span><span class="cur">المقرر: ${esc(e.curriculum)}</span></div>`).join('') || '<p class="note">لا توجد مشاركات قائمة.</p>'}
+    ${active.map((e) => { const t = (S.myQ || []).find((x) => x.entryId === e.id); return `<div class="entry"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${myTag(t)}<span class="cur">المقرر: ${esc(e.curriculum)}</span>${t && t.status === 'called' ? `<p class="callnow">تم نداؤك: توجّه الآن إلى ${esc(t.committee)}${t.hall ? ' — ' + esc(t.hall) : ''}</p>` : ''}</div>`; }).join('') || '<p class="note">لا توجد مشاركات قائمة.</p>'}
     ${old.length ? `<details><summary class="note">مشاركات ملغاة (${old.length})</summary>${old.map((e) => `<div class="entry off"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b><span class="tag">ملغاة</span><span class="cur">${esc(e.curriculum)}</span></div>`).join('')}</details>` : ''}</div>
   <div class="card"><h3>ملفي</h3><dl class="kv"><dt>الاسم</dt><dd>${esc(m.person.fullName)}</dd><dt>رقم الهوية</dt><dd class="ltr">${esc(m.person.nationalId)}</dd><dt>سنة الميلاد</dt><dd>${esc(r.birthYear)}</dd><dt>الفئة</dt><dd>${esc(r.categoryName)}</dd><dt>القسم</dt><dd>${esc(r.sectionName)}</dd><dt>الهاتف</dt><dd class="ltr">${esc(m.person.phone)}</dd><dt>هاتف آخر</dt><dd class="ltr">${esc(m.person.phone2 || '—')}</dd></dl>
     <div class="acts"><button class="btn sm" data-act="phones">تحديث أرقام التواصل</button></div>
     <p class="note">لتصحيح الاسم أو رقم الهوية أو سنة الميلاد بعد المراجعة، تواصل مع الإدارة التنفيذية لقسمك.</p></div></div>`;
 }
 
+function myTag(t) {
+  if (!t) return '<span class="tag">موعد المرحلة: بانتظار الإعلان</span>';
+  const cls = { waiting: 'info', called: 'warn', testing: 'plum', done: 'ok', needs_committee: 'warn' }[t.status] || '';
+  const extra = t.status === 'waiting' ? ` · ${t.ahead ? 'قبلك ' + t.ahead : 'أنت التالي'} · ${esc(t.committee)}` : t.status === 'testing' ? ' · ' + esc(t.committee) : '';
+  return `<span class="tag ${cls}">${esc(t.stageName)}: ${esc(t.statusName)}${extra}</span>`;
+}
 function wzInit(edit) {
   const m = S.my, r = edit ? m.registration : null;
   S.wz = { step: 1, year: r ? r.birthYear : m.person.birthYear || '', gender: r ? r.section : m.person.gender || '', phone2: m.person.phone2 || '', elig: null, eligErr: '', picks: {}, edit: !!r, agree: false };
@@ -312,12 +333,14 @@ function correctForm(r) {
 async function vDash() {
   const top = me.role === 'top';
   const s = await api('/stats' + (top && S.dash.section ? '?section=' + S.dash.section : ''));
+  const f = (await api('/reception?page=1' + (top && S.dash.section ? '&section=' + S.dash.section : '')).catch(() => ({}))).counts;
   const by = (arr, k) => (arr.find((x) => x.k === k) || {}).n || 0;
   const max = (arr) => Math.max(1, ...arr.map((x) => x.n));
   const bars = (arr, g) => arr.length ? `<div class="meters">${arr.map((x) => `<div class="meter"><span>${esc(x.k)}</span><span class="t"><i class="${g ? 'g' : ''}" data-w="${(x.n / max(arr)) * 100}"></i></span><b>${x.n}</b></div>`).join('')}</div>` : '<p class="note">لا توجد بيانات بعد.</p>';
   const c = pub.competition;
   return `<div class="head"><div><h1>${top ? 'لوحة المتابعة' : 'لوحة القسم'}</h1><p>${esc(c ? c.name + ' · الدورة ' + c.number : '')} · ${top ? (S.dash.section ? esc(meta.sections[S.dash.section]) : 'القسمان') : esc(me.sectionName)} · ${esc(c ? c.state.label : '')}</p></div>
     ${top ? `<div class="acts" role="group" aria-label="القسم">${[['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${S.dash.section === k ? 'pri' : ''}" data-act="dsec" data-s="${k}">${n}</button>`).join('')}</div>` : ''}</div>
+  ${f ? `<h2>التصفيات الأولية: اليوم</h2><div class="kpis"><div class="kpi main"><b>${f.persons || 0}</b><span>حاضرون</span></div><div class="kpi"><b>${f.waiting || 0}</b><span>في الانتظار</span></div><div class="kpi"><b>${f.active || 0}</b><span>نودوا أو جارٍ اختبارهم</span></div><div class="kpi"><b>${f.done || 0}</b><span>انتهى اختبارهم</span></div><div class="kpi"><b>${f.needs || 0}</b><span>بانتظار تحديد اللجنة</span></div></div><h2>التسجيل</h2>` : ''}
   <div class="kpis"><div class="kpi main"><b>${s.total}</b><span>إجمالي التسجيلات</span></div>
     <div class="kpi"><b>${by(s.byStatus, 'submitted')}</b><span>بانتظار المراجعة</span></div><div class="kpi"><b>${by(s.byStatus, 'returned')}</b><span>مطلوب استكمال</span></div>
     <div class="kpi"><b>${by(s.byStatus, 'accepted')}</b><span>مقبول</span></div><div class="kpi"><b>${by(s.byStatus, 'rejected') + by(s.byStatus, 'withdrawn')}</b><span>غير مقبول أو منسحب</span></div></div>
@@ -395,7 +418,138 @@ async function vAudit() {
   <div class="pager"><span class="note">صفحة ${d.page} من ${pages} · ${d.total} حدثًا</span><div class="acts"><button class="btn sm" data-act="apage" data-p="${d.page - 1}" ${d.page > 1 ? '' : 'disabled'}>الأحدث</button><button class="btn sm" data-act="apage" data-p="${d.page + 1}" ${d.page < pages ? '' : 'disabled'}>الأقدم</button></div></div></div>`;
 }
 
-const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit };
+// ---------- الاستقبال وتسجيل الحضور ----------
+const TK = { waiting: 'info', needs_committee: 'warn', called: 'warn', testing: 'plum', done: 'ok', no_show: 'bad', cancelled: '' };
+const tTag = (t) => `<span class="tag ${TK[t.status] || ''}">${t.seq ? '#' + t.seq + ' · ' : ''}${esc(t.statusName)}${t.committee ? ' · ' + esc(t.committee) : ''}</span>`;
+async function vReception() {
+  const f = S.rec = S.rec || { q: '', section: '', category: '', state: '', page: 1 };
+  const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
+  const d = S.recData = await api('/reception?' + qs);
+  const c = d.counts, pages = Math.max(1, Math.ceil(d.total / d.pageSize));
+  const row = (r) => {
+    const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
+    const quick = el.length && el.every((e) => e.candidates.length === 1);
+    return `<tr><td><b>${esc(r.name)}</b>${me.role === 'top' ? `<br><small class="note">${esc(r.sectionName)}</small>` : ''}</td><td>${esc(r.category)}</td>
+    <td><div class="chips">${r.entries.map((e) => `<span class="ent"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b> ${!e.needsCommittee ? '<span class="tag">اختبار إلكتروني</span>' : e.ticket && e.ticket.status !== 'cancelled' ? tTag(e.ticket) + (['waiting', 'needs_committee', 'no_show'].includes(e.ticket.status) ? ` <button class="btn link" data-act="tk-cancel" data-id="${e.ticket.id}">إلغاء</button>` : '') : '<span class="tag">لم يحضر</span>'}</span>`).join('')}</div></td>
+    <td>${el.length ? `<button class="btn ${quick ? 'pri' : ''} sm" data-act="${quick ? 'ci-quick' : 'ci-open'}" data-id="${r.id}">${quick ? 'تثبيت الحضور' : 'تسجيل الحضور…'}</button>${quick && el.length > 1 ? ` <button class="btn link" data-act="ci-open" data-id="${r.id}">اختيار</button>` : ''}` : '<span class="tag ok">حاضر</span>'}</td></tr>`;
+  };
+  return `<div class="head"><div><h1>الاستقبال وتسجيل الحضور</h1><p>${esc(d.stageName)} · ${me.role === 'top' ? (f.section ? esc(meta.sections[f.section]) : 'القسمان') : esc(me.sectionName)} · الأسماء مرتبة أبجديًا، والدور في الطابور بحسب وقت تثبيت الحضور</p></div><div class="acts"><a class="btn" href="#queues">الطوابير</a></div></div>
+  <div class="kpis"><div class="kpi main"><b>${c.persons || 0}</b><span>حاضرون</span></div><div class="kpi"><b>${c.waiting || 0}</b><span>في الانتظار</span></div><div class="kpi"><b>${c.active || 0}</b><span>نودوا أو جارٍ اختبارهم</span></div><div class="kpi"><b>${c.done || 0}</b><span>انتهى اختبارهم</span></div><div class="kpi"><b>${c.needs || 0}</b><span>بانتظار تحديد اللجنة</span></div></div>
+  <div class="card"><form class="filters" data-form="recf" role="search"><input type="search" id="rf-q" value="${esc(f.q)}" placeholder="ابحث بالاسم أو الهوية أو الهاتف" aria-label="بحث" autofocus>
+    ${me.role === 'top' ? `<select id="rf-section" aria-label="القسم">${opts(Object.entries(meta.sections), f.section, 'القسمان')}</select>` : ''}
+    <select id="rf-category" aria-label="الفئة">${opts(pub.categories.map((x) => [x.id, x.name]), f.category, 'كل الفئات')}</select>
+    <select id="rf-state" aria-label="الحضور">${opts([['absent', 'لم يحضروا'], ['present', 'حاضرون']], f.state, 'الجميع')}</select><button class="btn pri" type="submit">بحث</button></form>
+  <p class="note">${d.total} متسابقًا مقبولًا</p>
+  ${d.rows.length ? `<div class="scroll"><table class="list stack"><thead><tr><th>الاسم</th><th>الفئة</th><th>المشاركات والحضور</th><th></th></tr></thead><tbody>${d.rows.map(row).join('')}</tbody></table></div>
+  <div class="pager"><span class="note">صفحة ${d.page} من ${pages}</span><div class="acts"><button class="btn sm" data-act="rpage" data-p="${d.page - 1}" ${d.page > 1 ? '' : 'disabled'}>السابق</button><button class="btn sm" data-act="rpage" data-p="${d.page + 1}" ${d.page < pages ? '' : 'disabled'}>التالي</button></div></div>`
+    : '<div class="empty"><p>لا يوجد متسابقون مطابقون. يظهر هنا المقبولون فقط.</p></div>'}</div>`;
+}
+function checkinForm(r) {
+  const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
+  modal('تسجيل حضور ' + r.name, `<p class="note">اختر المشاركات التي يحضرها اليوم. حضور الحفظ لا يعني حضور التلاوة تلقائيًا.</p><form data-form="checkin" data-id="${r.id}"><p class="err" hidden></p>
+  ${el.map((e) => `<div class="pick on"><label class="check"><input type="checkbox" name="e" value="${e.id}" checked>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</label>
+    ${e.candidates.length > 1 ? `<div class="field"><label>اللجنة</label><select name="c-${e.id}">${opts(e.candidates.map((x) => [x.id, x.name + (x.hall ? ' — ' + x.hall : '')]), '', 'اختر اللجنة…')}</select></div>`
+      : e.candidates.length ? `<p class="note">اللجنة: ${esc(e.candidates[0].name)}${e.candidates[0].hall ? ' — ' + esc(e.candidates[0].hall) : ''}</p>` : '<p class="err">لا توجد لجنة مطابقة؛ يُسجَّل حضوره «بانتظار تحديد اللجنة».</p>'}</div>`).join('')}
+  <div class="acts"><button class="btn pri" type="submit">تثبيت الحضور</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`);
+}
+async function doCheckin(regId, items) {
+  const r = await api('/checkin', { method: 'POST', body: { registrationId: regId, items } });
+  toast(r.tickets.map((t) => `رقم ${t.seq}: ${t.committee || 'بانتظار تحديد اللجنة'}`).join(' · '));
+}
+
+// ---------- الطوابير والنداء ----------
+const since = (t) => { if (!t) return ''; const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 1 ? 'الآن' : `منذ ${m} د`; };
+async function vQueues() {
+  const q = S.q = S.q || { section: '' };
+  const d = await api('/queues' + (me.role === 'top' && q.section ? '?section=' + q.section : ''));
+  startPoll(3000, repaint);
+  const card = (c) => {
+    const cur = c.current, w = c.waiting;
+    let act = '';
+    if (c.canOperate) {
+      if (!cur) act = `<button class="btn pri big-btn" data-act="q-next" data-id="${c.id}" ${w.some((x) => !x.busy) ? '' : 'disabled'}>نداء التالي</button>`;
+      else if (cur.status === 'called') act = `<button class="btn pri" data-act="q-act" data-a="start" data-id="${cur.id}">بدء الاختبار</button><button class="btn" data-act="q-act" data-a="recall" data-id="${cur.id}">إعادة النداء</button><button class="btn badb" data-act="q-act" data-a="noshow" data-id="${cur.id}">لم يستجب</button>`;
+      else act = `<button class="btn pri big-btn" data-act="q-act" data-a="finish" data-id="${cur.id}">إنهاء الاختبار</button>`;
+    }
+    return `<article class="card qcard ${cur ? 'q-' + cur.status : ''}"><div class="qh"><div><h3>${esc(c.name)}</h3><span class="note">${esc(c.hall || '—')}${me.role === 'top' ? ' · ' + esc(c.sectionName) : ''}</span></div><span class="note">منتظر ${w.length} · انتهى ${c.done}</span></div>
+      <div class="qcur">${cur ? `<span class="tag ${TK[cur.status]}">${esc(cur.statusName)}${cur.calls > 1 ? ' · نداء ' + cur.calls : ''}</span><b>${esc(cur.name)}</b><small>${esc(cur.category)}${cur.trackName ? ' · ' + esc(cur.trackName) : ''} · ${since(cur.status === 'testing' ? cur.startedAt : cur.calledAt)}</small>` : '<span class="note">لا يوجد متسابق حالي</span>'}</div>
+      ${act ? `<div class="acts">${act}</div>` : ''}
+      <ol class="qlist">${w.slice(0, 6).map((t) => `<li><span class="seq">${t.seq}</span><span>${esc(t.name)}</span>${t.busy ? '<span class="tag warn">في لجنة أخرى</span>' : ''}</li>`).join('') || '<li class="note">لا منتظرين</li>'}${w.length > 6 ? `<li class="note">و${w.length - 6} آخرون</li>` : ''}</ol></article>`;
+  };
+  return `<div class="head"><div><h1>${me.role === 'judge' ? 'طابور لجنتي' : 'الطوابير والنداء'}</h1><p>${esc(d.stageName)} · يتحدث تلقائيًا كل 3 ثوانٍ</p></div>
+    <div class="acts">${me.role === 'top' ? [['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${q.section === k ? 'pri' : ''}" data-act="qsec" data-s="${k}">${n}</button>`).join('') : ''}${['exec', 'chief', 'top'].includes(me.role) ? '<a class="btn sm" href="#screen">شاشة الانتظار</a>' : ''}</div></div>
+  ${d.needsCommittee.length ? `<div class="card warnbox"><h3>بانتظار تحديد اللجنة (${d.needsCommittee.length})</h3>${d.needsCommittee.map((t) => `<div class="acts needs"><span><b>${esc(t.name)}</b> · ${esc(t.branchName)}${t.trackName ? ' · ' + esc(t.trackName) : ''} · ${esc(t.category)} · #${t.seq}</span>
+    ${t.candidates.length ? `<select id="as-${t.id}" aria-label="اللجنة">${opts(t.candidates.map((x) => [x.id, x.name]), '', 'اختر اللجنة…')}</select><button class="btn sm pri" data-act="tk-assign" data-id="${t.id}">إسناد</button>` : '<span class="tag bad">لا توجد لجنة مطابقة: أنشئ لجنة من «اللجان»</span>'}</div>`).join('')}</div>` : ''}
+  ${d.committees.length ? `<div class="qgrid">${d.committees.map(card).join('')}</div>` : `<div class="card empty"><p>${['judge', 'coordinator'].includes(me.role) ? 'لم تُكلَّف بلجنة بعد.' : 'لا توجد لجان نشطة.'}</p></div>`}`;
+}
+
+// ---------- اللجان والتكليفات ----------
+async function vCommittees() {
+  const q = S.cm = S.cm || { section: '' };
+  const [{ committees }, staff] = await Promise.all([api('/committees' + (me.role === 'top' && q.section ? '?section=' + q.section : '')), ['exec', 'top'].includes(me.role) ? api('/staff').then((x) => x.staff) : Promise.resolve([])]);
+  S.committees = committees; S.staff = staff;
+  const admin = ['exec', 'top'].includes(me.role);
+  const card = (c) => {
+    const pool = staff.filter((u) => u.section === c.section && !c.members.some((m) => m.userId === u.id));
+    return `<article class="card"><div class="qh"><div><h3>${esc(c.name)} ${c.active ? '' : '<span class="tag bad">موقوفة</span>'}</h3><span class="note">${esc(c.hall || 'بدون قاعة')} · ${esc(c.stageName)}${me.role === 'top' ? ' · ' + esc(c.sectionName) : ''}</span></div>
+      ${c.canAdmin ? `<div class="acts"><button class="btn sm" data-act="cm-edit" data-id="${c.id}">تعديل</button></div>` : ''}</div>
+      <p class="note">${esc(c.branchName)}${c.trackNames.length ? ' · ' + c.trackNames.map(esc).join('، ') : ' · كل المسارات'} · ${c.categoryNames.length ? c.categoryNames.map(esc).join('، ') : 'كل الفئات'}</p>
+      <ul class="members">${c.members.map((m) => `<li><span>${esc(m.name)} <small class="note">${m.kind === 'judge' ? esc(m.specialty || 'محكم') : 'منسق النداء'}</small></span>${c.canAdmin ? `<button class="btn link" data-act="cm-unassign" data-id="${c.id}" data-u="${m.userId}" aria-label="إلغاء تكليف ${esc(m.name)}">إلغاء</button>` : ''}</li>`).join('') || '<li class="note">لا تكليفات بعد</li>'}</ul>
+      ${c.canAdmin && pool.length ? `<div class="acts"><select id="cm-u-${c.id}" aria-label="المستخدم">${opts(pool.map((u) => [u.id, u.name + ' — ' + (u.specialty || u.roleName)]), '', 'تكليف مستخدم…')}</select><select id="cm-k-${c.id}" aria-label="نوع التكليف">${opts([['judge', 'محكم'], ['coordinator', 'منسق النداء']], 'judge')}</select><button class="btn sm pri" data-act="cm-assign" data-id="${c.id}">تكليف</button></div>` : ''}</article>`;
+  };
+  return `<div class="head"><div><h1>لجان التحكيم</h1><p>كل لجنة لفرع ومسار وفئات محددة في قسم واحد. يُسند الحاضر تلقائيًا إلى اللجنة المطابقة، وتظهر قاعتها على شاشة الانتظار.</p></div>
+    <div class="acts">${me.role === 'top' ? [['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${q.section === k ? 'pri' : ''}" data-act="cmsec" data-s="${k}">${n}</button>`).join('') : ''}${admin ? '<button class="btn pri" data-act="cm-new">إضافة لجنة</button>' : ''}</div></div>
+  ${admin && !staff.some((u) => u.role === 'judge') ? '<div class="banner info">لا توجد حسابات محكمين في القسم بعد. تنشئها الإدارة العليا من «الحسابات».</div>' : ''}
+  <div class="qgrid">${committees.map(card).join('')}</div>`;
+}
+function committeeForm(c) {
+  const branches = pub.branches.filter((b) => b.registrable && pub.curricula.some((x) => x.branch === b.code));
+  const br = c ? c.branch : branches[0].code;
+  modal(c ? 'تعديل ' + c.name : 'إضافة لجنة', `<form data-form="committee" data-id="${c ? c.id : ''}"><p class="err" hidden></p>
+  <div class="row2"><div class="field"><label for="k-n">اسم اللجنة</label><input id="k-n" value="${esc(c ? c.name : '')}" required></div><div class="field"><label for="k-h">القاعة أو الموقع (يظهر على الشاشة)</label><input id="k-h" value="${esc(c ? c.hall : '')}"></div></div>
+  ${!c && me.role === 'top' ? `<div class="field"><label for="k-s">القسم</label><select id="k-s">${opts(Object.entries(meta.sections), S.cm.section || 'M')}</select></div>` : ''}
+  <div class="field"><label for="k-b">الفرع</label><select id="k-b" data-act-change="kb">${opts(branches.map((b) => [b.code, b.name]), br)}</select></div>
+  <div id="k-scope">${scopeBoxes(br, c)}</div>
+  ${c ? `<label class="check"><input type="checkbox" id="k-a" ${c.active ? 'checked' : ''}>اللجنة نشطة</label>` : ''}
+  <div class="acts"><button class="btn pri" type="submit">حفظ</button>${c ? `<button class="btn badb" type="button" data-act="cm-del" data-id="${c.id}">حذف</button>` : ''}<button class="btn" type="button" data-act="close">إلغاء</button></div></form>`);
+}
+function scopeBoxes(br, c) {
+  const tracks = [...new Map(pub.curricula.filter((x) => x.branch === br && x.trackName).map((x) => [x.track, x.trackName])).entries()];
+  const cats = pub.categories.filter((x) => x.branches.includes(br));
+  return `${tracks.length > 1 ? `<div class="field"><span class="lab">المسارات (بدون تحديد = كلها)</span><div class="boxes">${tracks.map(([t, n]) => `<label><input type="checkbox" name="kt" value="${esc(t)}" ${c && c.tracks.includes(t) ? 'checked' : ''}>${esc(n)}</label>`).join('')}</div></div>` : ''}
+  <div class="field"><span class="lab">الفئات (بدون تحديد = كلها)</span><div class="boxes">${cats.map((x) => `<label><input type="checkbox" name="kc" value="${x.id}" ${c && c.categories.includes(x.id) ? 'checked' : ''}>${esc(x.name)}</label>`).join('')}</div><small>اسم اللجنة قد يجمع أكثر من فئة للتشغيل، ولا يعني ذلك دمجها في الترتيب.</small></div>`;
+}
+
+// ---------- شاشة قاعة الانتظار ----------
+const SCR = { last: 0, first: true, sound: false, section: 'M' };
+async function vScreen() {
+  const d = await api('/screen?since=' + SCR.last + (me.role === 'top' ? '&section=' + SCR.section : ''));
+  const fresh = SCR.first ? [] : d.calls.filter((c) => c.fresh).reverse();
+  SCR.first = false; SCR.last = d.lastId;
+  if (fresh.length) announce(fresh);
+  startPoll(2000, repaint);
+  const top = d.calls[0];
+  return `<div class="scr"><header class="scr-top"><div><b>اقرأ<i>.</i></b> <span>${esc(d.competition)} · ${esc(d.stageName)} · ${esc(d.sectionName)}</span></div>
+    <div class="acts"><span class="clock">${new Date().toLocaleTimeString('ar-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}</span>
+    ${me.role === 'top' ? `<button class="btn sm ghost" data-act="ssec">${SCR.section === 'M' ? 'عرض قسم النساء' : 'عرض قسم الرجال'}</button>` : ''}
+    <button class="btn sm ${SCR.sound ? 'gold' : 'ghost'}" data-act="sound">${SCR.sound ? 'الصوت مفعّل' : 'تفعيل الصوت'}</button><button class="btn sm ghost" data-act="fs">ملء الشاشة</button>${me.role !== 'screen' ? `<a class="btn sm ghost" href="#${homeOf()}">خروج من الشاشة</a>` : ''}</div></header>
+  <section class="scr-now ${top && top.fresh ? 'flash' : ''}">${top ? `<p class="lbl">${top.kind === 'recall' ? 'نداء متكرر' : 'النداء الحالي'}</p><h1>${esc(top.name)}</h1><p class="to">يتوجه إلى <b>${esc(top.committee)}</b>${top.hall ? ` · <b>${esc(top.hall)}</b>` : ''}</p>` : '<p class="lbl">قاعة الانتظار</p><h1>أهلًا بكم</h1><p class="to">ستظهر هنا أسماء المتسابقين عند نداء لجانهم</p>'}</section>
+  <div class="scr-body"><div class="scr-grid">${d.committees.map((k) => `<div class="scr-c ${k.current ? 's-' + k.current.status : ''}"><span class="scr-h">${esc(k.name)}<small>${esc(k.hall)}</small></span><b>${k.current ? esc(k.current.name) : '—'}</b><span class="scr-st">${k.current ? esc(k.current.statusName) : 'بانتظار النداء'} · منتظر ${k.waiting}</span></div>`).join('')}</div>
+  <aside class="scr-log"><h2>آخر النداءات</h2><ol>${d.calls.slice(0, 8).map((c) => `<li><b>${esc(c.name)}</b><span>${esc(c.committee)}${c.hall ? ' · ' + esc(c.hall) : ''}</span></li>`).join('') || '<li>لا نداءات بعد</li>'}</ol></aside></div></div>`;
+}
+function chime() { try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.setValueAtTime(0.2, a.currentTime); g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.9); o.start(); o.stop(a.currentTime + 0.9); } catch (e) {} }
+function announce(list) {
+  if (!SCR.sound) return;
+  chime();
+  if (!('speechSynthesis' in window)) return;
+  const voice = speechSynthesis.getVoices().find((v) => /^ar/i.test(v.lang));
+  for (const c of list) {
+    const u = new SpeechSynthesisUtterance(`${c.kind === 'recall' ? 'نداء متكرر. ' : ''}المتسابق ${c.name}، يرجى التوجه إلى ${c.committee}${c.hall ? '، ' + c.hall : ''}`);
+    u.lang = 'ar'; if (voice) u.voice = voice; u.rate = 0.9; speechSynthesis.speak(u);
+  }
+}
+
+const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen };
 
 // ---------- الأحداث ----------
 const val = (id) => (document.getElementById(id) || {}).value || '';
@@ -450,6 +604,36 @@ document.addEventListener('click', async (e) => {
     else if (a === 'edit-user') { userForm(S.users.find((u) => u.id === +id)); specToggle(); }
     else if (a === 'reset-u') { const u = S.users.find((x) => x.id === +id); const r = await api(`/users/${id}/reset`, { method: 'POST' }); pwBox('كلمة مرور مؤقتة', u.login, r.tempPassword); }
     else if (a === 'toggle-u') { const u = S.users.find((x) => x.id === +id); await api('/users/' + id, { method: 'PATCH', body: { active: !u.active } }); toast(u.active ? 'أُوقف الحساب' : 'فُعّل الحساب'); render(); }
+    // الاستقبال
+    else if (a === 'rpage') { S.rec.page = +b.dataset.p; render(); }
+    else if (a === 'ci-open') checkinForm(S.recData.rows.find((r) => r.id === +id));
+    else if (a === 'ci-quick') {
+      if (busy) return; busy = true; b.disabled = true;
+      try { const r = S.recData.rows.find((x) => x.id === +id); await doCheckin(r.id, r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled')).map((e) => ({ entryId: e.id, committeeId: e.candidates[0].id }))); render(); }
+      finally { busy = false; }
+    }
+    else if (a === 'tk-cancel') modal('إلغاء الحضور', `<p>يُلغى تثبيت حضور هذه المشاركة ويخرج من الطابور. يُحفظ الإجراء في السجل.</p><form data-form="tkcancel" data-id="${id}"><p class="err" hidden></p><div class="field"><label for="tc-r">السبب <span class="req">*</span></label><textarea id="tc-r" required></textarea></div><div class="acts"><button class="btn badb" type="submit">إلغاء الحضور</button><button class="btn" type="button" data-act="close">تراجع</button></div></form>`);
+    // الطوابير
+    else if (a === 'qsec') { S.q.section = b.dataset.s; render(); }
+    else if (a === 'q-next' || a === 'q-act') {
+      if (busy) return; busy = true; b.disabled = true;
+      try {
+        const r = a === 'q-next' ? await api(`/committees/${id}/next`, { method: 'POST' }) : await api(`/tickets/${id}/action`, { method: 'POST', body: { action: b.dataset.a } });
+        toast(a === 'q-next' ? 'نودي: ' + r.ticket.name : r.ticket.name + ': ' + r.ticket.statusName); await repaint();
+      } catch (err) { toast(err.message); await repaint(); } finally { busy = false; }
+    }
+    else if (a === 'tk-assign') { const v = val('as-' + id); if (!v) return toast('اختر اللجنة'); await api(`/tickets/${id}/assign`, { method: 'POST', body: { committeeId: v } }); toast('أُسند إلى اللجنة'); repaint(); }
+    // اللجان
+    else if (a === 'cmsec') { S.cm.section = b.dataset.s; render(); }
+    else if (a === 'cm-new') committeeForm(null);
+    else if (a === 'cm-edit') committeeForm(S.committees.find((c) => c.id === +id));
+    else if (a === 'cm-assign') { const u = val('cm-u-' + id); if (!u) return toast('اختر المستخدم'); await api(`/committees/${id}/members`, { method: 'POST', body: { userId: u, kind: val('cm-k-' + id) } }); toast('تم التكليف'); render(); }
+    else if (a === 'cm-unassign') { await api(`/committees/${id}/members/${b.dataset.u}`, { method: 'DELETE' }); toast('أُلغي التكليف'); render(); }
+    else if (a === 'cm-del') { await api('/committees/' + id, { method: 'DELETE' }); closeModal(); toast('حُذفت اللجنة'); render(); }
+    // الشاشة
+    else if (a === 'sound') { SCR.sound = !SCR.sound; if (SCR.sound) { chime(); try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch (e) {} } repaint(); }
+    else if (a === 'fs') { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch (e) { toast('ملء الشاشة غير متاح هنا؛ استخدم F11'); } }
+    else if (a === 'ssec') { SCR.section = SCR.section === 'M' ? 'F' : 'M'; SCR.first = true; SCR.last = 0; repaint(); }
     else if (a === 'asec') { Object.assign(S.audit, { section: b.dataset.s, page: 1 }); render(); }
     else if (a === 'apage') { S.audit.page = +b.dataset.p; render(); }
   } catch (err) { showErr(dlg.open ? $('#dlg-b .err') : null, err); }
@@ -460,6 +644,8 @@ document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'u-r') specToggle();
   if (t.id === 'u-role') { S.usersRole = t.value; render(); }
+  if (['rf-section', 'rf-category', 'rf-state'].includes(t.id)) { S.rec[t.id.slice(3)] = t.value; S.rec.page = 1; render(); }
+  if (t.id === 'k-b') $('#k-scope').innerHTML = scopeBoxes(t.value, null);
   if (['f-section', 'f-category', 'f-branch', 'f-status'].includes(t.id)) { S.regs[t.id.slice(2)] = t.value; S.regs.page = 1; render(); }
   const k = t.dataset.wz; if (!k || !S.wz) return;
   const w = S.wz;
@@ -493,6 +679,20 @@ document.addEventListener('submit', async (e) => {
     }
     else if (k === 'withdraw') { await api('/my/withdraw', { method: 'POST', body: { reason: val('wd-r') } }); closeModal(); toast('سُجّل انسحابك'); render(); }
     else if (k === 'phones') { await api('/my/profile', { method: 'PATCH', body: { phone: val('ph-1'), phone2: val('ph-2') } }); closeModal(); toast('حُفظت أرقام التواصل'); render(); }
+    else if (k === 'recf') { S.rec.q = val('rf-q'); S.rec.page = 1; await render(); const i = $('#rf-q'); if (i) { i.focus(); i.select(); } }
+    else if (k === 'checkin') {
+      const items = $$('input[name=e]:checked', f).map((x) => { const sel = f.elements['c-' + x.value]; return { entryId: +x.value, committeeId: sel ? sel.value || null : undefined }; });
+      if (items.some((x) => x.committeeId === null)) throw new Error('اختر اللجنة لكل مشاركة');
+      await doCheckin(+f.dataset.id, items); closeModal(); render();
+    }
+    else if (k === 'tkcancel') { await api(`/tickets/${f.dataset.id}/cancel`, { method: 'POST', body: { reason: val('tc-r') } }); closeModal(); toast('أُلغي الحضور'); render(); }
+    else if (k === 'committee') {
+      const id = f.dataset.id;
+      const body = { name: val('k-n'), hall: val('k-h'), branch: val('k-b'), tracks: $$('[name=kt]:checked', f).map((x) => x.value), categories: $$('[name=kc]:checked', f).map((x) => +x.value) };
+      if ($('#k-s')) body.section = val('k-s');
+      if (id) { body.active = $('#k-a').checked; await api('/committees/' + id, { method: 'PUT', body }); } else await api('/committees', { method: 'POST', body });
+      closeModal(); toast('حُفظت اللجنة'); render();
+    }
     else if (k === 'regf') { S.regs.q = val('f-q'); S.regs.page = 1; render(); }
     else if (k === 'correct') {
       const id = f.dataset.id;

@@ -6,7 +6,7 @@ import seed from './dist/seed.db';
 
 const JAR = 'iqra-demo-cookie-v1';
 let jar = '';
-try { jar = localStorage.getItem(JAR) || ''; } catch (e) {}
+try { jar = sessionStorage.getItem(JAR) || ''; } catch (e) {}
 window.__iqraDemo = true;
 
 const boot = (async () => {
@@ -20,6 +20,7 @@ window.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input.url;
   if (!url.startsWith('/api')) return realFetch(input, init);
   const app = await boot;
+  if (globalThis.__iqraDb) globalThis.__iqraDb.sync();
   const u = new URL(url, 'http://demo.local');
   const headers = {};
   for (const [k, v] of Object.entries(init.headers || {})) headers[k.toLowerCase()] = v;
@@ -39,7 +40,7 @@ window.fetch = async (input, init = {}) => {
   };
   await app.handle(req, res);
   const sc = res.headers['set-cookie'];
-  if (sc) { const v = String(sc).split(';')[0]; jar = /Max-Age=0/.test(sc) ? '' : v; try { localStorage.setItem(JAR, jar); } catch (e) {} }
+  if (sc) { const v = String(sc).split(';')[0]; jar = /Max-Age=0/.test(sc) ? '' : v; try { sessionStorage.setItem(JAR, jar); } catch (e) {} }
   if (method !== 'GET' && globalThis.__iqraDb) globalThis.__iqraDb.save();
   return new Response(res.body, { status: res.statusCode, headers: { 'content-type': res.headers['content-type'] || 'text/plain; charset=utf-8' } });
 };
@@ -47,7 +48,8 @@ window.fetch = async (input, init = {}) => {
 // لوحة حسابات التجربة
 const ACCOUNTS = [
   ['admin', 'الإدارة العليا (القسمان)'], ['exec.m', 'الإدارة التنفيذية — رجال'], ['exec.f', 'الإدارة التنفيذية — نساء'],
-  ['chief.m', 'رئيس لجنة التحكيم — رجال'], ['judge.m', 'محكم — رجال'], ['1000000001', 'متسابق مسجَّل'],
+  ['chief.m', 'رئيس لجنة التحكيم — رجال'], ['coord.m', 'منسق النداء — لجنة الحفظ: اليافعون'], ['judge.m', 'محكم — لجنة الحفظ: اليافعون'],
+  ['screen.m', 'شاشة قاعة انتظار الرجال'], ['screen.f', 'شاشة قاعة انتظار النساء'], ['1100000002', 'متسابق حاضر في الطابور'], ['1000000001', 'متسابق طلبه قيد المراجعة'],
 ];
 window.__iqraDemoLogin = async (login) => {
   await fetch('/api/logout', { method: 'POST', headers: { 'X-Iqra': '1' } });
@@ -61,6 +63,7 @@ function panel() {
   wrap.className = 'demo';
   wrap.innerHTML = `<details><summary>نسخة تجريبية · حسابات التجربة</summary><div class="demo-in">
     <p>البيانات هنا محفوظة في متصفحك فقط، والأسماء متخيَّلة. كلمة مرور كل الحسابات: <b dir="ltr">Iqra-2026</b></p>
+    <p class="note">لتجربة النداء: افتح هذه الصفحة في تبويبين؛ ادخل في أحدهما بحساب «شاشة قاعة انتظار الرجال»، وفي الآخر بحساب «منسق النداء»، ثم اضغط «نداء التالي».</p>
     ${ACCOUNTS.map(([l, n]) => `<button type="button" class="btn sm" data-demo="${l}"><span>${n}</span><small dir="ltr">${l}</small></button>`).join('')}
     <p class="note">أو أنشئ حساب متسابق جديدًا من «إنشاء حساب متسابق».</p>
     <button type="button" class="btn sm badb" data-demo-reset>إعادة البيانات التجريبية إلى البداية</button></div></details>`;
@@ -71,7 +74,7 @@ function panel() {
     if (e.target.closest('[data-demo-reset]')) {
       const btn = e.target.closest('[data-demo-reset]');
       if (btn.dataset.sure !== '1') { btn.dataset.sure = '1'; btn.textContent = 'اضغط مرة أخرى للتأكيد: تُحذف كل تعديلاتك'; return; }
-      try { localStorage.removeItem('iqra-demo-db-v1'); localStorage.removeItem(JAR); } catch (err) {}
+      try { localStorage.removeItem('iqra-demo-db-v1'); localStorage.removeItem('iqra-demo-db-v1-ver'); sessionStorage.removeItem(JAR); } catch (err) {}
       location.hash = 'home'; location.reload();
     }
   });

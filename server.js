@@ -7,21 +7,13 @@ const auth = require('./lib/auth');
 const R = require('./lib/rules');
 const { seedIfEmpty, copyCompetition } = require('./lib/seed');
 
-const ROLES = { contestant: 'متسابق', judge: 'محكم', coordinator: 'منسق لجنة التحكيم', chief: 'رئيس لجنة التحكيم', exec: 'الإدارة التنفيذية', top: 'الإدارة العليا' };
-const SECTIONS = { M: 'قسم الرجال', F: 'قسم النساء' };
-const REG_ST = { submitted: 'بانتظار المراجعة', returned: 'مطلوب استكمال', accepted: 'مقبول', rejected: 'غير مقبول', withdrawn: 'منسحب' };
-const COMP_ST = { draft: 'مسودة', open: 'مفتوحة', closed: 'مغلقة', archived: 'مؤرشفة' };
-const SPECIALTIES = ['محكم جودة الحفظ الأول', 'محكم جودة الحفظ الثاني', 'محكم التجويد الأول', 'محكم التجويد الثاني', 'محكم الصوت والنغم', 'محكم الوقف والابتداء'];
+const U = require('./lib/util');
+const { ROLES, SECTIONS, REG_ST, COMP_ST, SPECIALTIES, Bad, str, wrap, need, audit, isTop, scope, inScope, comp } = U;
 const PAGE = 25;
 
 // ---------- الصلاحيات (تُفحص هنا على الخادم في كل طلب) ----------
-const isStaff = (u) => u.role !== 'contestant';
 const canSeeRegs = (u) => ['exec', 'chief', 'top'].includes(u.role);     // قائمة التسجيلات
 const canManageRegs = (u) => ['exec', 'top'].includes(u.role);           // المراجعة والتصحيح والتصدير
-const isTop = (u) => u.role === 'top';
-// نطاق القسم: الإدارة العليا ترى القسمين ويمكنها التصفية، وغيرها يرى قسمه فقط
-const scope = (u, wanted) => (isTop(u) ? (SECTIONS[wanted] ? wanted : '') : u.section);
-const inScope = (u, section) => isTop(u) || (u.section && u.section === section);
 
 const app = express();
 app.disable('x-powered-by');
@@ -39,30 +31,7 @@ app.use('/api', auth.csrf);
 app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
 // ---------- أدوات ----------
-class Bad extends Error { constructor(m, c = 400, extra) { super(m); this.code = c; this.extra = extra; } }
-function str(v, max, label, required = true) {
-  const s = typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim();
-  if (required && !s) throw new Bad(`الحقل «${label}» مطلوب`);
-  if (s.length > max) throw new Bad(`الحقل «${label}» أطول من المسموح (${max} حرفًا)`);
-  return s;
-}
-const wrap = (fn) => (req, res) => {
-  try { const r = fn(req, res); if (r !== undefined) res.json(r); }
-  catch (e) {
-    if (e instanceof Bad) return res.status(e.code).json({ error: e.message, ...(e.extra || {}) });
-    if (e && e.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(409).json({ error: 'السجل موجود من قبل' });
-    console.error(e);
-    res.status(500).json({ error: 'حدث خطأ في الخادم' });
-  }
-};
-const need = (test) => (req, res, next) => (test(req.user) ? next() : res.status(403).json({ error: 'لا تملك صلاحية لهذا الإجراء' }));
-const json = (v) => (v === undefined ? null : JSON.stringify(v));
-function audit(actor, action, entity, entityId, { section = '', summary = '', before, after, reason = '' } = {}) {
-  db.prepare('INSERT INTO audit(at,actor_id,action,entity,entity_id,section,summary,before,after,reason) VALUES (?,?,?,?,?,?,?,?,?,?)')
-    .run(Date.now(), actor ? actor.id : null, action, entity, entityId ?? null, section, summary, json(before), json(after), reason);
-}
 const publicUser = (u) => ({ id: u.id, login: u.login, name: u.name, phone: u.phone, email: u.email, role: u.role, roleName: ROLES[u.role], section: u.section, sectionName: SECTIONS[u.section] || (u.role === 'top' ? 'القسمان' : ''), specialty: u.specialty, active: !!u.active, mustChange: !!u.must_change, createdAt: u.created_at, lastLogin: u.last_login });
-function comp() { const c = R.current(); if (!c) throw new Bad('لا توجد دورة حالية', 404); return c; }
 const compJson = (c) => ({ id: c.id, name: c.name, number: c.number, year: c.year, regOpen: c.reg_open, regClose: c.reg_close, editClose: c.edit_close, status: c.status, statusName: COMP_ST[c.status], minBirthYear: c.min_birth_year, notes: c.notes, state: R.regState(c) });
 
 // ---------- عام ----------
@@ -101,7 +70,7 @@ app.post('/api/logout', wrap((req, res) => { auth.clearSession(req, res); return
 app.post('/api/signup', wrap((req, res) => {
   if (!config.allowSignup) throw new Bad('إنشاء الحسابات من الموقع متوقف حاليًا. تواصل مع إدارة المسابقة.', 403);
   const ipKey = (req.ip || '') + '|signup';
-  if (auth.tooMany(ipKey, 20)) throw new Bad('محاولات كثيرة. حاول لاحقًا.', 429);
+  if (auth.tooMany(ipKey, parseInt(process.env.SIGNUP_LIMIT || '20', 10))) throw new Bad('محاولات كثيرة. حاول لاحقًا.', 429);
   auth.failed(ipKey);
   const b = req.body || {};
   const nid = R.normId(b.nationalId); if (!nid) throw new Bad('رقم الهوية يجب أن يكون من 6 إلى 20 رقمًا');
@@ -575,6 +544,9 @@ app.get('/api/audit', need(isTop), wrap((req) => {
   const rows = db.prepare(`SELECT a.*, u.name AS actor, u.role AS actor_role FROM audit a LEFT JOIN users u ON u.id=a.actor_id ${w} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...args, 50, (page - 1) * 50);
   return { total, page, pageSize: 50, rows: rows.map((a) => ({ id: a.id, at: a.at, action: a.action, entity: a.entity, entityId: a.entity_id, section: a.section, actor: a.actor || 'النظام', actorRole: ROLES[a.actor_role] || '', summary: a.summary, reason: a.reason, before: JSON.parse(a.before || 'null'), after: JSON.parse(a.after || 'null') })) };
 }));
+
+// التشغيل الميداني: اللجان والحضور والطوابير والنداء وشاشة الانتظار
+require('./lib/field')(app);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'غير موجود' }));
 
