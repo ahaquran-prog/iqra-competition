@@ -47,7 +47,7 @@ app.get('/api/public', wrap(() => {
     competition: compJson(c),
     branches: R.branchesOf(c.id).map((b) => ({ code: b.code, name: b.name, intro: b.intro, conditions: b.conditions, stages: b.stages, registrable: !!b.registrable })),
     categories: cats.map((x) => ({ id: x.id, name: x.name, fromYear: x.from_year, toYear: x.to_year, branches: x.branches })),
-    curricula: R.curriculaOf(c.id).map((x) => ({ id: x.id, branch: x.branch, track: x.track, trackName: x.track_name, categoryId: x.category_id, content: x.content })),
+    curricula: R.curriculaOf(c.id).map((x) => ({ id: x.id, branch: x.branch, track: x.track, trackName: x.track_name, categoryId: x.category_id, content: x.content, surah: x.surah, ayahFrom: x.ayah_from, ayahTo: x.ayah_to })),
   };
 }));
 
@@ -381,7 +381,7 @@ app.get('/api/admin/competition', need(isTop), wrap(() => {
     all: db.prepare('SELECT id,name,number,year,status,is_current FROM competitions ORDER BY id DESC').all().map((x) => ({ id: x.id, name: x.name, number: x.number, year: x.year, statusName: COMP_ST[x.status], current: !!x.is_current })),
     branches: R.branchesOf(c.id).map((b) => ({ id: b.id, code: b.code, name: b.name, intro: b.intro, conditions: b.conditions, stages: b.stages, registrable: !!b.registrable })),
     categories: R.categoriesOf(c.id).map((x) => ({ id: x.id, name: x.name, fromYear: x.from_year, toYear: x.to_year, branches: x.branches, used: usedCats.has(x.id) })),
-    curricula: R.curriculaOf(c.id).map((x) => ({ id: x.id, branch: x.branch, track: x.track, trackName: x.track_name, categoryId: x.category_id, content: x.content, used: used.has(x.id) })),
+    curricula: R.curriculaOf(c.id).map((x) => ({ id: x.id, branch: x.branch, track: x.track, trackName: x.track_name, categoryId: x.category_id, content: x.content, surah: x.surah, ayahFrom: x.ayah_from, ayahTo: x.ayah_to, used: used.has(x.id) })),
     registrations: db.prepare('SELECT COUNT(*) n FROM registrations WHERE comp_id=?').get(c.id).n,
   };
 }));
@@ -442,7 +442,13 @@ app.put('/api/admin/curricula', need(isTop), wrap((req) => {
     const branch = String(x.branch || ''); if (!codes.includes(branch)) throw new Bad('فرع غير صحيح في المقررات');
     const track = str(x.track, 20, 'رمز المسار'); if (!/^[a-z0-9_]+$/.test(track)) throw new Bad('رمز المسار بالإنجليزية الصغيرة والأرقام فقط، مثل tartil');
     const cat = x.categoryId ? +x.categoryId : null; if (cat && !cats.includes(cat)) throw new Bad('فئة غير صحيحة في المقررات');
-    return { id: x.id ? +x.id : null, branch, track, track_name: str(x.trackName, 60, 'اسم المسار', false), category_id: cat, content: str(x.content, 300, 'نص المقرر'), sort: i };
+    // المقطع اختياري، ويلزم صحته إن أُدخل: سورة موجودة ونطاق آيات لا يتجاوز عددها
+    let surah = null, from = null, to = null;
+    if (x.surah) {
+      surah = +x.surah; from = +x.ayahFrom; to = +x.ayahTo;
+      if (!require('./lib/rubrics').passage(surah, from, to)) throw new Bad(`المقطع غير صحيح في «${String(x.content || '').slice(0, 40)}»: تحقق من السورة وبداية الآيات ونهايتها`);
+    }
+    return { id: x.id ? +x.id : null, branch, track, track_name: str(x.trackName, 60, 'اسم المسار', false), category_id: cat, content: str(x.content, 300, 'نص المقرر'), surah, ayah_from: from, ayah_to: to, sort: i };
   });
   const key = (x) => `${x.branch}|${x.track}|${x.category_id ?? 'all'}`;
   if (new Set(items.map(key)).size !== items.length) throw new Bad('يوجد مقرران للفرع والمسار والفئة نفسها');
@@ -453,8 +459,8 @@ app.put('/api/admin/curricula', need(isTop), wrap((req) => {
       db.prepare('DELETE FROM curricula WHERE id=?').run(o.id);
     }
     for (const x of items) {
-      if (x.id && old.some((o) => o.id === x.id)) db.prepare('UPDATE curricula SET branch=?,track=?,track_name=?,category_id=?,content=?,sort=? WHERE id=?').run(x.branch, x.track, x.track_name, x.category_id, x.content, x.sort, x.id);
-      else db.prepare('INSERT INTO curricula(comp_id,branch,track,track_name,category_id,content,sort) VALUES (?,?,?,?,?,?,?)').run(c.id, x.branch, x.track, x.track_name, x.category_id, x.content, x.sort);
+      if (x.id && old.some((o) => o.id === x.id)) db.prepare('UPDATE curricula SET branch=?,track=?,track_name=?,category_id=?,content=?,surah=?,ayah_from=?,ayah_to=?,sort=? WHERE id=?').run(x.branch, x.track, x.track_name, x.category_id, x.content, x.surah, x.ayah_from, x.ayah_to, x.sort, x.id);
+      else db.prepare('INSERT INTO curricula(comp_id,branch,track,track_name,category_id,content,surah,ayah_from,ayah_to,sort) VALUES (?,?,?,?,?,?,?,?,?,?)').run(c.id, x.branch, x.track, x.track_name, x.category_id, x.content, x.surah, x.ayah_from, x.ayah_to, x.sort);
     }
     audit(req.user, 'settings', 'curricula', c.id, { summary: 'تعديل المقررات (لا يغيّر المقررات المحفوظة في المشاركات السابقة)', before: old, after: items });
   })();
@@ -547,6 +553,8 @@ app.get('/api/audit', need(isTop), wrap((req) => {
 
 // التشغيل الميداني: اللجان والحضور والطوابير والنداء وشاشة الانتظار
 require('./lib/field')(app);
+// الرصد والنتائج
+require('./lib/judging')(app);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'غير موجود' }));
 

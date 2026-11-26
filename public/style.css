@@ -258,3 +258,32 @@ body.screen-mode{background:#1f1529}
 @media(prefers-reduced-motion:reduce){.scr-now.flash h1{animation:none}}
 .entry .tag{white-space:normal;justify-self:start;align-self:start}
 @media(max-width:640px){.entry{grid-template-columns:minmax(0,1fr)}}
+
+/* استمارات الرصد */
+.grid-form{border-collapse:collapse;width:100%;font-size:14px}
+.grid-form th,.grid-form td{border:1px solid var(--line);padding:6px;text-align:center;vertical-align:middle}
+.grid-form thead th{background:var(--soft);font-weight:600;position:sticky;top:0;z-index:1}
+.grid-form thead tr:nth-child(2) th{top:34px}
+.grid-form th small{display:block;color:var(--bad);font-weight:700}
+.grid-form tbody th{background:var(--soft);font-size:16px;width:56px}
+.ctr{display:inline-flex;align-items:center;gap:2px}
+.cbtn{width:34px;height:40px;border:1px solid var(--line);background:#fff;border-radius:8px;font:700 18px "IBM Plex Sans Arabic";cursor:pointer;color:var(--plum)}
+.cbtn:active{background:var(--soft)}
+.cin{width:46px;min-height:40px;padding:4px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.calc{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0;padding:10px 14px;background:var(--soft);border-radius:10px;font-size:15px}
+.total-bar{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:16px 0;padding:14px 18px;border-radius:12px;background:var(--plum);color:#fff}
+.total-bar b{font:700 34px "IBM Plex Sans Arabic";color:var(--gold);font-variant-numeric:tabular-nums}
+.opt{border:1px solid var(--line);border-radius:10px;padding:6px 14px;font-weight:700;font-size:18px}
+.opt:has(input:checked){border-color:var(--plum3);background:var(--soft)}
+table.crit td.desc{font-size:13px;color:var(--mute);min-width:240px}
+table.crit select{min-width:110px}
+.dedl{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+.mx{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.matrix td.txt,.matrix th.txt{text-align:right;min-width:280px;position:sticky;right:0;background:#fff;z-index:1}
+.matrix thead th.txt{background:var(--soft);z-index:2}
+.quran{font:400 22px/2 "Amiri","Traditional Arabic",serif}
+.mx.big .quran{font-size:30px}
+.ayn{color:var(--goldi);font-size:.8em;white-space:nowrap}
+.bsm td{text-align:center!important;background:var(--soft)!important}
+.note-in{min-width:160px;min-height:40px;font-size:14px}
+tr.pend td{background:#fffaf0}

@@ -43,11 +43,11 @@ function pwBox(title, login, pass) {
 const NAV = {
   public: [['home', 'تعريف المسابقة'], ['login', 'تسجيل الدخول'], ['signup', 'إنشاء حساب متسابق']],
   contestant: [['my', 'مشاركتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  judge: [['space', 'مساحتي'], ['queues', 'طابور لجنتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  judge: [['grade', 'الرصد'], ['queues', 'طابور لجنتي'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   coordinator: [['queues', 'النداء'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  chief: [['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'التسجيلات (اطلاع)'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  chief: [['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['committees', 'اللجان'], ['regs', 'التسجيلات (اطلاع)'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   exec: [['dash', 'لوحة القسم'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'التسجيلات'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  top: [['dash', 'لوحة المتابعة'], ['regs', 'التسجيلات'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['setup', 'إعداد الدورة'], ['users', 'الحسابات'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  top: [['dash', 'لوحة المتابعة'], ['regs', 'التسجيلات'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['setup', 'إعداد الدورة'], ['users', 'الحسابات'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   screen: [['screen', 'شاشة الانتظار']],
 };
 const navFor = () => NAV[me ? me.role : 'public'];
@@ -60,6 +60,7 @@ function route() {
   view = allowed.includes(h) ? h : homeOf();
   stopPoll(); document.body.classList.toggle('screen-mode', view === 'screen');
   if (view === 'screen') { SCR.first = true; SCR.last = 0; }
+  if (view !== 'grade') S.fm = null;
   render(); scrollTo(0, 0);
 }
 addEventListener('hashchange', route);
@@ -172,7 +173,7 @@ async function vSpace() {
     <span class="cur">${esc(c.stageName)} · ${c.members.filter((m) => m.userId === me.id).map((m) => (m.kind === 'judge' ? 'محكم' : 'منسق النداء')).join('، ')}</span></div>`).join('')
     : '<p class="note">لم تُكلَّف بلجنة بعد. تكلّفك الإدارة التنفيذية لقسمك من صفحة «اللجان».</p>'}
   ${committees.length ? `<div class="acts"><a class="btn pri" href="#queues">${me.role === 'coordinator' ? 'فتح شاشة النداء' : 'طابور لجنتي'}</a></div>` : ''}</div>
-  ${me.role === 'judge' ? '<div class="card"><h2>رصد الدرجات</h2><p class="note">استمارات التحكيم بالخصومات تُفعَّل في الخطوة القادمة. ستظهر لك استمارة تخصصك للمتسابق الجاري في لجنتك.</p></div>' : ''}`;
+  ${me.role === 'judge' ? '<div class="card"><h2>رصد الدرجات</h2><p>تظهر لك في «الرصد» استمارة تخصصك لكل متسابق بدأ اختباره في لجنتك. تحفظ مسودة ثم ترسلها فتُقفل.</p><a class="btn pri" href="#grade">الرصد</a></div>' : ''}`;
 }
 
 // ---------- المتسابق: مشاركتي ومعالج التسجيل ----------
@@ -365,8 +366,8 @@ async function vSettings() {
   <details class="blk"><summary>الفئات العمرية (تُحسب من سنة الميلاد)</summary><form data-form="cats"><p class="err" hidden></p><div class="scroll"><table class="edit-table"><thead><tr><th>الفئة</th><th>من سنة</th><th>إلى سنة</th><th>الفروع المسموحة</th><th></th></tr></thead><tbody id="cat-rows">
     ${a.categories.map((x) => catRow(x, codes)).join('')}</tbody></table></div><p class="note">اترك «من سنة» فارغًا للفئة المفتوحة من الأقدم (مثل: 2008 فما قبل). يرفض الخادم الحدود المتداخلة.</p>
     <div class="acts"><button class="btn" type="button" data-act="add-cat">إضافة فئة</button><button class="btn pri" type="submit">حفظ الفئات</button></div></form></details>
-  <details class="blk"><summary>المقررات والمسارات</summary><form data-form="curr"><p class="err" hidden></p><div class="scroll"><table class="edit-table"><thead><tr><th>الفرع</th><th>رمز المسار</th><th>اسم المسار</th><th>الفئة</th><th>المقرر</th><th></th></tr></thead><tbody id="curr-rows">
-    ${a.curricula.map((x) => currRow(x, codes, catOpts)).join('')}</tbody></table></div><p class="note">رمز المسار بالإنجليزية (مثل cat، j5، tartil، tadweer، main). في الحفظ يختار المتسابق مسارًا واحدًا، وفي التلاوة ترتيل أو تدوير.</p>
+  <details class="blk"><summary>المقررات والمسارات</summary><form data-form="curr"><p class="err" hidden></p><div class="scroll"><table class="edit-table"><thead><tr><th>الفرع</th><th>رمز المسار</th><th>اسم المسار</th><th>الفئة</th><th>المقرر</th><th>المقطع: سورة (رقم)</th><th>من آية</th><th>إلى آية</th><th></th></tr></thead><tbody id="curr-rows">
+    ${a.curricula.map((x) => currRow(x, codes, catOpts)).join('')}</tbody></table></div><p class="note">رمز المسار بالإنجليزية (مثل cat، j5، tartil، tadweer، main). في الحفظ يختار المتسابق مسارًا واحدًا، وفي التلاوة ترتيل أو تدوير. «المقطع» لمقررات التلاوة: رقم السورة ونطاق الآيات، ومنه تُعرض الآيات في مصفوفة التجويد للمحكم.</p>
     <div class="acts"><button class="btn" type="button" data-act="add-curr">إضافة مقرر</button><button class="btn pri" type="submit">حفظ المقررات</button></div></form></details>
   <details class="blk"><summary>الفروع: التعريف والشروط</summary>${a.branches.map((b) => `<form data-form="branch" data-id="${b.id}" class="card"><p class="err" hidden></p><div class="row2"><div class="field"><label>اسم الفرع</label><input name="name" value="${esc(b.name)}"></div><div class="field"><label>المراحل</label><input name="stages" value="${esc(b.stages)}"></div></div>
     <div class="field"><label>التعريف المختصر</label><textarea name="intro">${esc(b.intro)}</textarea></div><div class="field"><label>الشروط والمتطلبات (تظهر في «المزيد»)</label><textarea name="conditions">${esc(b.conditions)}</textarea></div>
@@ -379,7 +380,7 @@ async function vSettings() {
 const catRow = (x, codes) => `<tr data-id="${esc(x.id || '')}"><td><input name="name" value="${esc(x.name || '')}" aria-label="اسم الفئة"></td><td><input class="yr" name="from" inputmode="numeric" value="${esc(x.fromYear ?? '')}" aria-label="من سنة"></td><td><input class="yr" name="to" inputmode="numeric" value="${esc(x.toYear ?? '')}" aria-label="إلى سنة"></td>
   <td><div class="boxes">${codes.filter((b) => b.registrable).map((b) => `<label><input type="checkbox" name="br" value="${esc(b.code)}" ${(x.branches || []).includes(b.code) ? 'checked' : ''}>${esc(b.name)}</label>`).join('')}</div></td><td>${x.used ? '<span class="tag">عليها تسجيلات</span>' : '<button class="btn sm badb" type="button" data-act="del-row">حذف</button>'}</td></tr>`;
 const currRow = (x, codes, catOpts) => `<tr data-id="${esc(x.id || '')}"><td><select name="branch" aria-label="الفرع">${opts(codes.map((b) => [b.code, b.name]), x.branch)}</select></td><td><input name="track" class="ltr" value="${esc(x.track || '')}" aria-label="رمز المسار"></td><td><input name="trackName" value="${esc(x.trackName || '')}" aria-label="اسم المسار"></td>
-  <td><select name="cat" aria-label="الفئة">${opts(catOpts, x.categoryId ?? '')}</select></td><td><input name="content" value="${esc(x.content || '')}" aria-label="المقرر"></td><td>${x.used ? '<span class="tag">عليه مشاركات</span>' : '<button class="btn sm badb" type="button" data-act="del-row">حذف</button>'}</td></tr>`;
+  <td><select name="cat" aria-label="الفئة">${opts(catOpts, x.categoryId ?? '')}</select></td><td><input name="content" value="${esc(x.content || '')}" aria-label="المقرر"></td><td><input class="yr" name="surah" inputmode="numeric" value="${esc(x.surah ?? '')}" aria-label="رقم السورة"></td><td><input class="yr" name="af" inputmode="numeric" value="${esc(x.ayahFrom ?? '')}" aria-label="من آية"></td><td><input class="yr" name="at" inputmode="numeric" value="${esc(x.ayahTo ?? '')}" aria-label="إلى آية"></td><td>${x.used ? '<span class="tag">عليه مشاركات</span>' : '<button class="btn sm badb" type="button" data-act="del-row">حذف</button>'}</td></tr>`;
 
 // ---------- الحسابات (الإدارة العليا) ----------
 async function vUsers() {
@@ -549,7 +550,116 @@ function announce(list) {
   }
 }
 
-const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen };
+// ---------- الرصد (المحكم) ----------
+const n2 = (x) => (x == null ? '—' : (Math.round(x * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }));
+const EV = { none: ['', 'لم يبدأ'], draft: ['warn', 'مسودة'], submitted: ['ok', 'أُرسل'] };
+async function vGrade() {
+  if (S.fm) return gradeForm();
+  const d = await api('/judge/work');
+  startPoll(8000, () => { if (!S.fm) repaint(); });
+  return `<div class="head"><div><h1>الرصد</h1><p>${esc(me.specialty)} · ${esc(d.stageName)} · يظهر المتسابق هنا بعد بدء اختباره في لجنتك</p></div></div>
+  ${d.committees.length ? d.committees.map((k) => `<div class="card"><div class="qh"><div><h2>${esc(k.name)}</h2><span class="note">${esc(k.hall || '')} · ${k.rubric ? esc(k.rubricTitle) : 'تخصصك لا يقابل استمارة في هذه اللجنة'}</span></div></div>
+    ${k.rows.length ? `<table class="list stack"><thead><tr><th>المتسابق</th><th>الفئة</th><th>الاختبار</th><th>استمارتي</th><th></th></tr></thead><tbody>${k.rows.map((r) => `<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.category)}${r.trackName ? ' · ' + esc(r.trackName) : ''}</td><td><span class="tag ${r.status === 'testing' ? 'plum' : ''}">${r.status === 'testing' ? 'قيد الاختبار' : 'انتهى'}</span></td>
+      <td><span class="tag ${EV[r.evalStatus][0]}">${EV[r.evalStatus][1]}${r.raw != null ? ' · ' + n2(r.raw) + ' من ' + n2(r.base) : ''}</span></td><td>${k.rubric ? `<button class="btn sm ${r.evalStatus === 'submitted' ? '' : 'pri'}" data-act="fm-open" data-id="${r.ticketId}">${r.evalStatus === 'submitted' ? 'عرض' : r.evalStatus === 'draft' ? 'متابعة الرصد' : 'رصد'}</button>` : ''}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="empty">لا يوجد متسابق بدأ اختباره بعد.</p>'}</div>`).join('') : '<div class="card empty"><p>لم تُكلَّف بالتحكيم في لجنة بعد.</p></div>'}`;
+}
+async function openForm(ticketId) {
+  const d = await api('/judge/form/' + ticketId);
+  const data = d.evaluation ? JSON.parse(JSON.stringify(d.evaluation.data)) : {};
+  if (d.rubric.kind === 'segments' && !Array.isArray(data.segments)) data.segments = [{}, {}, {}];
+  if (d.rubric.kind === 'criteria') data.deductions = data.deductions || {};
+  if (d.rubric.kind === 'matrix') data.rows = data.rows || {};
+  S.fm = { ticketId, ...d, data, version: d.evaluation ? d.evaluation.version : null, locked: d.evaluation && d.evaluation.status === 'submitted', dirty: false, big: false };
+  stopPoll(); render();
+}
+// حساب مباشر للعرض فقط؛ الخادم هو المرجع
+function fmCalc() {
+  const f = S.fm, R = f.rubric, d = f.data, num = (v) => Math.max(0, parseInt(v, 10) || 0);
+  if (R.kind === 'segments') {
+    let raw = 0; const g = R.groups.map((gr) => { let ded = 0; for (let i = 0; i < R.segments; i++) for (const it of gr.items) ded += num((d.segments[i] || {})[it.k]) * it.d; const net = Math.max(0, gr.base - ded); raw += net; return { n: gr.n || '', base: gr.base, ded, net }; });
+    return { raw, base: R.base, groups: g };
+  }
+  if (R.kind === 'criteria') { let sum = 0, miss = 0; for (const c of R.criteria) { if (d[c.k] == null || d[c.k] === '') miss++; else sum += +d[c.k]; } const ded = R.deductions.reduce((a, x) => a + num(d.deductions[x.k]), 0); return { raw: Math.max(0, sum - ded), base: R.base, sum, ded, miss }; }
+  const base = R.base[f.track]; let ded = 0;
+  for (const a of f.passage.ayat) for (const c of R.cols) ded += num((d.rows[a.n] || {})[c.k]) * c.d;
+  return { raw: Math.max(0, base - ded), base, ded };
+}
+const ctr = (path, v, lock) => `<span class="ctr">${lock ? '' : `<button type="button" class="cbtn" data-act="ctr" data-p="${path}" data-d="-1" aria-label="إنقاص">−</button>`}<input class="cin" inputmode="numeric" data-ctr="${path}" value="${esc(v || 0)}" ${lock ? 'readonly' : ''} aria-label="العدد">${lock ? '' : `<button type="button" class="cbtn" data-act="ctr" data-p="${path}" data-d="1" aria-label="زيادة">+</button>`}</span>`;
+function gradeForm() {
+  const f = S.fm, R = f.rubric, d = f.data, c = f.contestant, lock = f.locked, k = fmCalc();
+  let body = '';
+  if (R.kind === 'segments') {
+    const items = R.groups.flatMap((g) => g.items.map((it) => ({ ...it, g: g.n })));
+    const heads = []; for (const it of items) { const last = heads[heads.length - 1]; if (last && last.n === it.n) last.span++; else heads.push({ n: it.n, span: 1, col: it.col }); }
+    body = `<div class="scroll"><table class="grid-form"><thead><tr><th rowspan="2">المقطع</th>${heads.map((h) => `<th colspan="${h.span}">${esc(h.n)}</th>`).join('')}</tr>
+      <tr>${items.map((it) => `<th>${esc(it.col || '—')}<small>−${it.d}</small></th>`).join('')}</tr></thead><tbody>
+      ${[...Array(R.segments).keys()].map((i) => `<tr><th>${i + 1}</th>${items.map((it) => `<td>${ctr(`s.${i}.${it.k}`, (d.segments[i] || {})[it.k], lock)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <div class="calc">${k.groups.map((g) => `<span>${g.n ? esc(g.n) + ': ' : ''}الخصم ${n2(g.ded)} · الصافي <b>${n2(g.net)}</b> من ${g.base}</span>`).join('')}</div>
+    ${R.extra ? `<div class="field"><span class="lab">${esc(R.extra.n)} <span class="req">*</span></span><div class="acts" role="radiogroup">${R.extra.options.map((o) => `<label class="check opt"><input type="radio" name="fx" data-fx="${R.extra.k}" value="${o}" ${+d[R.extra.k] === o ? 'checked' : ''} ${lock ? 'disabled' : ''}>${o}</label>`).join('')}</div><small>تُضاف فوق المجموع.</small></div>` : ''}`;
+  } else if (R.kind === 'criteria') {
+    body = `<div class="scroll"><table class="list crit"><thead><tr><th>المعيار</th><th class="n">الدرجة المقررة</th><th>الدرجة المستحقة</th><th>المقياس</th></tr></thead><tbody>
+      ${R.criteria.map((cr) => `<tr><td><b>${esc(cr.n)}</b>${cr.group ? `<br><small class="note">${esc(cr.group)}</small>` : ''}</td><td class="n">${cr.max}</td><td><select data-fc="${cr.k}" ${lock ? 'disabled' : ''} aria-label="${esc(cr.n)}">${opts(cr.options.map((o) => [o, o]), d[cr.k] ?? '', 'اختر الدرجة')}</select></td><td class="desc">${esc(cr.desc)}</td></tr>`).join('')}</tbody></table></div>
+    <h3>موارد خصم الدرجات (درجة لكل مورد)</h3><div class="acts">${R.deductions.map((x) => `<label class="dedl">${esc(x.n)} ${ctr('d.' + x.k, d.deductions[x.k], lock)}</label>`).join('')}</div>
+    <div class="calc"><span>مجموع المعايير ${n2(k.sum)}${k.miss ? ` (${k.miss} بلا اختيار)` : ''}</span><span>الخصم ${k.ded}</span></div>`;
+  } else {
+    const P = f.passage;
+    body = `<div class="acts"><button type="button" class="btn sm" data-act="fm-big">${f.big ? 'تصغير الخط' : 'تكبير الخط'}</button><label class="note">انتقال إلى آية <select data-act-jump aria-label="انتقال إلى آية">${P.ayat.map((a) => `<option value="${a.n}">${a.n}</option>`).join('')}</select></label></div>
+    <div class="scroll mx ${f.big ? 'big' : ''}"><table class="grid-form matrix"><thead><tr><th rowspan="2" class="txt">الآية — سورة ${esc(P.name)}</th>${(() => { const h = []; for (const c2 of R.cols) { const l = h[h.length - 1]; if (l && l.n === c2.n) l.s++; else h.push({ n: c2.n, s: 1 }); } return h.map((x) => `<th colspan="${x.s}">${esc(x.n)}</th>`).join(''); })()}<th rowspan="2">ملاحظات الوقف والابتداء</th></tr>
+      <tr>${R.cols.map((c2) => `<th>${esc(c2.col || '—')}<small>−${c2.d}</small></th>`).join('')}</tr></thead><tbody>
+      ${P.bismillah ? `<tr class="bsm"><td class="txt quran" colspan="${R.cols.length + 2}">${esc(P.bismillah)}</td></tr>` : ''}
+      ${P.ayat.map((a) => `<tr id="ay-${a.n}"><td class="txt quran">${esc(a.text)} <span class="ayn">﴿${a.n}﴾</span></td>${R.cols.map((c2) => `<td>${ctr(`r.${a.n}.${c2.k}`, (d.rows[a.n] || {})[c2.k], lock)}</td>`).join('')}<td><input class="note-in" data-fn="${a.n}" value="${esc((d.rows[a.n] || {}).note || '')}" ${lock ? 'readonly' : ''} aria-label="ملاحظة الآية ${a.n}"></td></tr>`).join('')}</tbody></table></div>
+    <p class="note">النص بالرسم العثماني من مشروع تنزيل (tanzil.net).</p>
+    <div class="calc"><span>مجموع الخصم ${n2(k.ded)}</span></div>`;
+  }
+  return `<div class="head"><div><h1>${esc(R.title)}</h1><p>${esc(c.name)} · ${esc(c.category)} · ${esc(c.branchName)}${c.trackName ? ' · ' + esc(c.trackName) : ''} · ${esc(c.stageName)} · ${esc(c.committee)}${f.slot > 1 ? ' · المحكم ' + f.slot : ''}</p></div><div class="acts"><button class="btn" data-act="fm-back">رجوع إلى القائمة</button></div></div>
+  <div class="card"><p class="note">المقرر: ${esc(c.curriculum)} — ${esc(R.note)}</p>${!f.mine ? '<div class="banner">هذه الخانة يرصدها محكم آخر في اللجنة.</div>' : ''}${lock ? '<div class="banner info">أُرسل التقييم وأُقفل. لإعادة فتحه تواصل مع رئيس لجنة التحكيم.</div>' : ''}
+  <p class="err" hidden></p>${body}
+  <div class="total-bar"><span>درجتك في هذه الاستمارة</span><b>${n2(k.raw)}</b><span>من ${k.base}</span>${R.extra && d[R.extra.k] ? `<span>· ${esc(R.extra.n)} ${d[R.extra.k]}</span>` : ''}</div>
+  ${lock || !f.mine ? '' : `<label class="check"><input type="checkbox" id="fm-ok">راجعت الاستمارة، وأرغب في إرسالها (لا تُعدَّل بعد الإرسال)</label>
+  <div class="acts"><button class="btn" data-act="fm-save">حفظ مسودة</button><button class="btn pri" data-act="fm-submit">إرسال التقييم</button>${f.dirty ? '<span class="tag warn">تعديلات غير محفوظة</span>' : f.version ? '<span class="tag ok">محفوظ على الخادم</span>' : ''}</div>`}</div>`;
+}
+function fmSet(path, v) {
+  const f = S.fm, [t, a, b2] = path.split('.');
+  if (t === 's') { f.data.segments[+a] = f.data.segments[+a] || {}; f.data.segments[+a][b2] = v; }
+  else if (t === 'd') f.data.deductions[a] = v;
+  else if (t === 'r') { f.data.rows[a] = f.data.rows[a] || {}; f.data.rows[a][b2] = v; }
+  f.dirty = true;
+}
+function fmGet(path) { const d = S.fm.data, [t, a, b2] = path.split('.'); return +((t === 's' ? (d.segments[+a] || {})[b2] : t === 'd' ? d.deductions[a] : (d.rows[a] || {})[b2]) || 0); }
+function fmPaint() { const v = $('#view'), y = scrollY, a = document.activeElement && document.activeElement.dataset.ctr; v.innerHTML = gradeForm(); afterRender(v); scrollTo(0, y); if (a) { const e = v.querySelector(`[data-ctr="${a}"]`); if (e) { e.focus(); e.select(); } } }
+async function fmSave(submit) {
+  const f = S.fm;
+  const r = await api('/judge/form/' + f.ticketId, { method: 'PUT', body: { data: f.data, version: f.version, submit } });
+  f.version = r.evaluation.version; f.dirty = false; f.locked = r.evaluation.status === 'submitted';
+  toast(submit ? 'أُرسل التقييم: ' + n2(r.evaluation.raw) + ' من ' + n2(r.evaluation.base) : 'حُفظت المسودة على الخادم');
+  fmPaint();
+}
+
+// ---------- النتائج وكشف الترتيب ----------
+async function vResults() {
+  const q = S.res = S.res || { section: '', branch: '' };
+  const qs = new URLSearchParams(Object.entries(q).filter(([, v]) => v)).toString();
+  const d = await api('/results?' + qs);
+  return `<div class="head"><div><h1>النتائج وكشف الترتيب</h1><p>${esc(d.stageName)} · تُحسب تلقائيًا من الاستمارات المرسلة، والمتعادلون يأخذون الترتيب نفسه. يظهر هنا من بدأ اختباره أو أنهاه.</p></div>
+    <div class="acts"><button class="btn" data-act="csv" data-href="/api/results.csv?${esc(qs)}">تصدير الكشف إلى Excel (CSV)</button></div></div>
+  <div class="filters">${me.role === 'top' ? `<select id="rs-section" aria-label="القسم">${opts(Object.entries(meta.sections), q.section, 'القسمان')}</select>` : ''}<select id="rs-branch" aria-label="الفرع">${opts([['hifz', 'الحفظ'], ['tilawa', 'التلاوة']], q.branch, 'كل الفروع')}</select></div>
+  ${d.groups.length ? d.groups.map((g) => { const parts = (g.ranked[0] || g.pending[0]).parts; return `<div class="card"><h2>${esc(g.name)}</h2><p class="note">${esc(g.sectionName)} · المكتمل ${g.ranked.length} · غير المكتمل ${g.pending.length}</p>
+    <div class="scroll"><table class="list stack"><thead><tr><th class="n">الترتيب</th><th>المتسابق</th>${g.allAges ? '<th>الفئة</th>' : ''}${parts.map((p) => `<th class="n">${esc(p.n)} (${p.weight})</th>`).join('')}<th class="n">المجموع (${g.max})</th></tr></thead><tbody>
+    ${g.ranked.map((r) => `<tr class="click" data-act="res" data-id="${r.entryId}" tabindex="0"><td class="n"><b>${r.rank}</b>${r.tie ? ' <span class="tag warn">تعادل</span>' : ''}</td><td><b>${esc(r.name)}</b></td>${g.allAges ? `<td>${esc(r.category)}</td>` : ''}${r.parts.map((p) => `<td class="n">${n2(p.value)}</td>`).join('')}<td class="n"><b>${n2(r.total)}</b></td></tr>`).join('')}
+    ${g.pending.map((r) => `<tr class="click pend" data-act="res" data-id="${r.entryId}" tabindex="0"><td class="n">—</td><td><b>${esc(r.name)}</b><br><small class="note">بانتظار: ${r.missing.map((m) => esc(m.n)).join('، ')}</small></td>${g.allAges ? `<td>${esc(r.category)}</td>` : ''}${r.parts.map((p) => `<td class="n">${n2(p.value)}</td>`).join('')}<td class="n"><span class="tag warn">غير مكتملة</span></td></tr>`).join('')}
+    </tbody></table></div></div>`; }).join('') : '<div class="card empty"><p>لا توجد نتائج بعد. تظهر هنا بعد حضور المتسابقين وبدء الرصد.</p></div>'}`;
+}
+async function openResult(entryId) {
+  const d = await api('/results/entry/' + entryId), c = d.contestant, r = d.result;
+  modal(c.name, `<p class="note">${esc(c.category)} · ${esc(c.branchName)}${c.trackName ? ' · ' + esc(c.trackName) : ''} · ${esc(c.committee)} · ${esc(c.stageName)}</p><p class="err" hidden></p>
+  <table class="review"><tbody>${r.parts.map((p) => `<tr><th>${esc(p.n)} (من ${p.weight})</th><td><b>${n2(p.value)}</b>${p.judges.length > 1 && p.judges.some((x) => x != null) ? ` <span class="note">المحكمون: ${p.judges.map(n2).join(' و')}${p.bases ? ' من ' + n2(p.bases[0]) : ''}</span>` : p.judges[0] != null && p.bases ? ` <span class="note">الخام ${n2(p.judges[0])} من ${n2(p.bases[0])}</span>` : ''}</td></tr>`).join('')}
+  <tr><th>المجموع (من ${r.max})</th><td><b>${r.complete ? n2(r.total) : 'غير مكتمل'}</b></td></tr></tbody></table>
+  <h3>الاستمارات</h3>${d.evaluations.map((e) => `<div class="entry"><b>${esc(e.title)}${e.slot > 1 ? ' · المحكم ' + e.slot : ''}</b><span class="tag ${EV[e.status][0]}">${EV[e.status][1]}</span>
+    <span class="cur">${esc(e.judge)} · الخام ${n2(e.raw)} من ${n2(e.base)}${e.extra != null ? ' · المفردات ' + e.extra : ''}${e.submittedAt ? ' · ' + esc(fmt(e.submittedAt)) : ''}${e.revisions.length ? `<br>${e.revisions.map((v) => `أُعيد فتحه (${esc(v.actor)} · ${esc(fmt(v.at))}): كان ${n2(v.raw)}${v.extra != null ? ' / المفردات ' + v.extra : ''} — ${esc(v.reason)}`).join('<br>')}` : ''}</span>
+    ${e.status === 'submitted' ? `<div class="acts"><input id="ro-${e.id}" placeholder="سبب إعادة الفتح" aria-label="سبب إعادة الفتح"><button class="btn sm" data-act="reopen" data-id="${e.id}" data-e="${entryId}">إعادة فتح للمحكم</button></div>` : ''}</div>`).join('') || '<p class="note">لا توجد استمارات بعد.</p>'}`);
+}
+
+const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults };
 
 // ---------- الأحداث ----------
 const val = (id) => (document.getElementById(id) || {}).value || '';
@@ -604,6 +714,19 @@ document.addEventListener('click', async (e) => {
     else if (a === 'edit-user') { userForm(S.users.find((u) => u.id === +id)); specToggle(); }
     else if (a === 'reset-u') { const u = S.users.find((x) => x.id === +id); const r = await api(`/users/${id}/reset`, { method: 'POST' }); pwBox('كلمة مرور مؤقتة', u.login, r.tempPassword); }
     else if (a === 'toggle-u') { const u = S.users.find((x) => x.id === +id); await api('/users/' + id, { method: 'PATCH', body: { active: !u.active } }); toast(u.active ? 'أُوقف الحساب' : 'فُعّل الحساب'); render(); }
+    // الرصد
+    else if (a === 'fm-open') await openForm(+id);
+    else if (a === 'fm-back') { if (S.fm && S.fm.dirty && b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'توجد تعديلات غير محفوظة. اضغط مرة أخرى للخروج'; return; } S.fm = null; render(); }
+    else if (a === 'ctr') { const v = Math.max(0, Math.min(999, fmGet(b.dataset.p) + +b.dataset.d)); fmSet(b.dataset.p, v); fmPaint(); }
+    else if (a === 'fm-big') { S.fm.big = !S.fm.big; fmPaint(); }
+    else if (a === 'fm-save' || a === 'fm-submit') {
+      if (busy) return;
+      if (a === 'fm-submit' && !($('#fm-ok') || {}).checked) return showErr($('#view .err'), new Error('أكّد مراجعة الاستمارة قبل الإرسال'));
+      busy = true; try { await fmSave(a === 'fm-submit'); } catch (err) { showErr($('#view .err'), err); } finally { busy = false; }
+    }
+    // النتائج
+    else if (a === 'res') await openResult(+id);
+    else if (a === 'reopen') { await api(`/evaluations/${id}/reopen`, { method: 'POST', body: { reason: val('ro-' + id) } }); toast('أُعيد فتح الاستمارة للمحكم'); await openResult(+b.dataset.e); }
     // الاستقبال
     else if (a === 'rpage') { S.rec.page = +b.dataset.p; render(); }
     else if (a === 'ci-open') checkinForm(S.recData.rows.find((r) => r.id === +id));
@@ -644,6 +767,12 @@ document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'u-r') specToggle();
   if (t.id === 'u-role') { S.usersRole = t.value; render(); }
+  if (['rs-section', 'rs-branch'].includes(t.id)) { S.res[t.id.slice(3)] = t.value; render(); }
+  if (t.dataset.fc && S.fm) { S.fm.data[t.dataset.fc] = t.value === '' ? null : +t.value; S.fm.dirty = true; fmPaint(); }
+  if (t.dataset.fx && S.fm) { S.fm.data[t.dataset.fx] = +t.value; S.fm.dirty = true; fmPaint(); }
+  if (t.dataset.fn && S.fm) { S.fm.data.rows[t.dataset.fn] = S.fm.data.rows[t.dataset.fn] || {}; S.fm.data.rows[t.dataset.fn].note = t.value.slice(0, 300); S.fm.dirty = true; }
+  if (t.hasAttribute('data-act-jump')) { const r = document.getElementById('ay-' + t.value); if (r) r.scrollIntoView({ block: 'center' }); }
+  if (t.dataset.ctr && S.fm) { const v = Math.max(0, Math.min(999, parseInt(String(t.value).replace(/[٠-٩]/g, (x) => x.charCodeAt(0) - 1632), 10) || 0)); fmSet(t.dataset.ctr, v); fmPaint(); }
   if (['rf-section', 'rf-category', 'rf-state'].includes(t.id)) { S.rec[t.id.slice(3)] = t.value; S.rec.page = 1; render(); }
   if (t.id === 'k-b') $('#k-scope').innerHTML = scopeBoxes(t.value, null);
   if (['f-section', 'f-category', 'f-branch', 'f-status'].includes(t.id)) { S.regs[t.id.slice(2)] = t.value; S.regs.page = 1; render(); }
@@ -721,7 +850,7 @@ document.addEventListener('submit', async (e) => {
       await api('/admin/categories', { method: 'PUT', body: { categories } }); await refreshPublic(); toast('حُفظت الفئات'); render();
     }
     else if (k === 'curr') {
-      const curricula = $$('#curr-rows tr').map((tr) => ({ id: tr.dataset.id || null, branch: $('[name=branch]', tr).value, track: $('[name=track]', tr).value, trackName: $('[name=trackName]', tr).value, categoryId: $('[name=cat]', tr).value || null, content: $('[name=content]', tr).value }));
+      const curricula = $$('#curr-rows tr').map((tr) => ({ id: tr.dataset.id || null, branch: $('[name=branch]', tr).value, track: $('[name=track]', tr).value, trackName: $('[name=trackName]', tr).value, categoryId: $('[name=cat]', tr).value || null, content: $('[name=content]', tr).value, surah: $('[name=surah]', tr).value || null, ayahFrom: $('[name=af]', tr).value || null, ayahTo: $('[name=at]', tr).value || null }));
       await api('/admin/curricula', { method: 'PUT', body: { curricula } }); await refreshPublic(); toast('حُفظت المقررات'); render();
     }
     else if (k === 'branch') {
@@ -744,7 +873,7 @@ document.addEventListener('submit', async (e) => {
 });
 
 // إعادة قراءة الحساب بعد الدخول من خارج الواجهة (تستخدمه النسخة التجريبية)
-window.__iqraRefresh = async () => { closeModal(); S.wz = null; try { me = (await api('/me')).user; } catch { me = null; } pub = await api('/public'); if (location.hash.slice(1) === homeOf()) route(); else go(homeOf()); };
+window.__iqraRefresh = async () => { closeModal(); S.wz = null; S.fm = null; stopPoll(); try { me = (await api('/me')).user; } catch { me = null; } pub = await api('/public'); if (location.hash.slice(1) === homeOf()) route(); else go(homeOf()); };
 
 // ---------- البدء ----------
 (async () => {
