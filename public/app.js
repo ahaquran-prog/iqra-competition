@@ -42,12 +42,12 @@ function pwBox(title, login, pass) {
 // ---------- التوجيه والأدوار ----------
 const NAV = {
   public: [['home', 'تعريف المسابقة'], ['login', 'تسجيل الدخول'], ['signup', 'إنشاء حساب متسابق']],
-  contestant: [['my', 'مشاركتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  contestant: [['my', 'مشاركتي'], ['tests', 'اختبار التفسير'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   judge: [['grade', 'الرصد'], ['queues', 'طابور لجنتي'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   coordinator: [['queues', 'النداء'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  chief: [['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['committees', 'اللجان'], ['regs', 'التسجيلات (اطلاع)'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  exec: [['dash', 'لوحة القسم'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'التسجيلات'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  top: [['dash', 'لوحة المتابعة'], ['regs', 'التسجيلات'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['setup', 'إعداد الدورة'], ['users', 'الحسابات'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  chief: [['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['tests', 'اختبارات التفسير'], ['committees', 'اللجان'], ['regs', 'المسجلون (اطلاع)'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  exec: [['dash', 'لوحة القسم'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'المسجلون'], ['tests', 'اختبارات التفسير'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  top: [['dash', 'لوحة المتابعة'], ['regs', 'المسجلون'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['tests', 'اختبارات التفسير'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['setup', 'إعداد الدورة'], ['users', 'حسابات الكادر'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   screen: [['screen', 'شاشة الانتظار']],
 };
 const navFor = () => NAV[me ? me.role : 'public'];
@@ -61,6 +61,7 @@ function route() {
   stopPoll(); document.body.classList.toggle('screen-mode', view === 'screen');
   if (view === 'screen') { SCR.first = true; SCR.last = 0; }
   if (view !== 'grade') S.fm = null;
+  if (view !== 'tests') { S.exam = null; S.testId = null; clearInterval(EX.tick); }
   render(); scrollTo(0, 0);
 }
 addEventListener('hashchange', route);
@@ -84,6 +85,7 @@ async function render() {
   afterRender(v);
 }
 function afterRender(root) {
+  try { document.documentElement.style.setProperty('--hh', $('header.top').offsetHeight + 'px'); } catch (e) {}
   $$('[data-w]', root).forEach((e) => { e.style.width = Math.max(0, Math.min(100, +e.dataset.w)) + '%'; });
   $$('table.stack', root).forEach((t) => { const hs = [...t.querySelectorAll('thead th')].map((th) => th.textContent); t.querySelectorAll('tbody tr').forEach((tr) => [...tr.children].forEach((td, i) => { td.dataset.l = hs[i] || ''; })); });
 }
@@ -188,16 +190,14 @@ async function vMy() {
   if (!m.registration) {
     return `<div class="head"><div><h1>مرحبًا ${esc(m.person.fullName.split(' ')[0])}</h1><p>${esc(c.name)} · الدورة ${esc(c.number)}</p></div></div>
     <div class="card"><h2>لم تسجّل في هذه الدورة بعد</h2><p>${esc(c.state.label)}.</p>
-    ${m.canRegister ? '<p>أدخل سنة ميلادك فتظهر فئتك والفروع المتاحة لها، ثم اختر فروعك وراجع طلبك قبل تأكيده.</p><button class="btn pri" data-act="wz-start">ابدأ التسجيل</button>' : ''}</div>`;
+    ${m.canRegister ? '<p>أدخل سنة ميلادك فتظهر فئتك والفروع المتاحة لها، ثم اختر فروعك وراجع بياناتك قبل تأكيد التسجيل.</p><button class="btn pri" data-act="wz-start">ابدأ التسجيل</button>' : ''}</div>`;
   }
   const r = m.registration;
   const active = r.entries.filter((e) => e.status === 'active'), old = r.entries.filter((e) => e.status !== 'active');
   return `<div class="head"><div><h1>مشاركتي</h1><p>${esc(c.name)} · الدورة ${esc(c.number)}</p></div>
-    <div class="acts">${m.canEdit ? '<button class="btn pri" data-act="wz-edit">تعديل الطلب</button>' : ''}${m.canWithdraw ? '<button class="btn badb" data-act="withdraw">الانسحاب من المسابقة</button>' : ''}</div></div>
-  ${r.status === 'returned' ? `<div class="banner"><span><b>مطلوب استكمال:</b> ${esc(r.staffNote)}</span>${m.canEdit ? '<button class="btn sm" data-act="wz-edit">استكمال الطلب</button>' : ''}</div>` : ''}
-  ${r.status === 'rejected' && r.staffNote ? `<div class="banner"><span><b>ملاحظة الإدارة:</b> ${esc(r.staffNote)}</span></div>` : ''}
-  <div class="grid2"><div class="card"><div class="status"><span class="big">${esc(r.statusName)}</span>${stTag(r.status)}</div>
-    <p class="note">قُدّم الطلب ${esc(fmt(r.createdAt))}${r.updatedAt !== r.createdAt ? ' · آخر تحديث ' + esc(fmt(r.updatedAt)) : ''}</p>
+    <div class="acts">${m.canEdit ? '<button class="btn pri" data-act="wz-edit">تعديل التسجيل</button>' : ''}${m.canWithdraw ? '<button class="btn badb" data-act="withdraw">الانسحاب من المسابقة</button>' : ''}</div></div>
+  <div class="grid2"><div class="card"><div class="status"><span class="big">${esc(r.statusName)}</span></div>
+    <p class="note">سُجّلت ${esc(fmt(r.createdAt))}${r.updatedAt !== r.createdAt ? ' · آخر تحديث ' + esc(fmt(r.updatedAt)) : ''}</p>
     <h3>مشاركاتي (${active.length})</h3>
     ${active.map((e) => { const t = (S.myQ || []).find((x) => x.entryId === e.id); return `<div class="entry"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${myTag(t)}<span class="cur">المقرر: ${esc(e.curriculum)}</span>${t && t.status === 'called' ? `<p class="callnow">تم نداؤك: توجّه الآن إلى ${esc(t.committee)}${t.hall ? ' — ' + esc(t.hall) : ''}</p>` : ''}${(S.myR || []).filter((x) => x.entryId === e.id).map((x) => `<p class="myres">${esc(x.stageName)}: <b>${n2(x.total)}</b> من ${n2(x.max)} · الترتيب ${x.rank} من ${x.count}${x.nextStageName && x.qualified != null ? ` · ${x.qualified ? `<span class="tag ok">متأهل إلى ${esc(x.nextStageName)}</span>` : `<span class="tag">لم يتأهل إلى ${esc(x.nextStageName)}</span>`}` : ''}</p>`).join('')}</div>`; }).join('') || '<p class="note">لا توجد مشاركات قائمة.</p>'}
     ${old.length ? `<details><summary class="note">مشاركات ملغاة (${old.length})</summary>${old.map((e) => `<div class="entry off"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b><span class="tag">ملغاة</span><span class="cur">${esc(e.curriculum)}</span></div>`).join('')}</details>` : ''}</div>
@@ -262,7 +262,7 @@ function wizard() {
       <tr><th>سنة الميلاد والفئة</th><td>${esc(w.year)} · ${esc(w.elig.category.name)}</td></tr><tr><th>القسم</th><td>${w.gender === 'M' ? 'قسم الرجال' : 'قسم النساء'}</td></tr>
       ${chosen.map(({ b, t }) => `<tr><th>${esc(b.name)}${t.trackName ? ' · ' + esc(t.trackName) : ''}</th><td>${esc(t.content)}</td></tr>`).join('')}</tbody></table>
       <label class="check"><input type="checkbox" data-wz="agree" ${w.agree ? 'checked' : ''}>أقرّ بصحة البيانات، وأن الفئة محسوبة من سنة ميلادي.</label>
-      <div class="acts"><button class="btn pri" data-act="wz-submit" ${w.agree ? '' : 'disabled'}>${w.edit ? 'حفظ التعديل' : 'تأكيد الطلب'}</button><button class="btn" data-act="wz-back">السابق</button></div>`;
+      <div class="acts"><button class="btn pri" data-act="wz-submit" ${w.agree ? '' : 'disabled'}>${w.edit ? 'حفظ التعديل' : 'تأكيد التسجيل'}</button><button class="btn" data-act="wz-back">السابق</button></div>`;
   }
   return `<div class="head"><div><h1>${w.edit ? 'تعديل طلب التسجيل' : 'التسجيل في المسابقة'}</h1><p>${esc(m.competition.name)} · الدورة ${esc(m.competition.number)}</p></div></div>
   <ol class="steps">${steps.map((s, i) => `<li class="${i + 1 < w.step ? 'done' : i + 1 === w.step ? 'now' : ''}" ${i + 1 === w.step ? 'aria-current="step"' : ''}>${s}</li>`).join('')}</ol>
@@ -288,16 +288,16 @@ async function vRegs() {
     if (ts.length > 1) ts.forEach(([t, n]) => trackOpts.push([b.code + ':' + t, '— ' + b.name + ': ' + n]));
   }
   const pages = Math.max(1, Math.ceil(d.total / d.pageSize));
-  return `<div class="head"><div><h1>التسجيلات</h1><p>${me.role === 'top' ? 'القسمان' : esc(me.sectionName)} · مرتبة أبجديًا${chief ? ' · اطلاع دون بيانات الاتصال' : ''}</p></div>
+  return `<div class="head"><div><h1>المسجلون</h1><p>${me.role === 'top' ? 'القسمان' : esc(me.sectionName)} · مرتبة أبجديًا${chief ? ' · اطلاع دون بيانات الاتصال' : ''}</p></div>
     ${canManage() ? `<div class="acts"><button class="btn" data-act="csv" data-href="/api/registrations.csv?${esc(regParams({ page: '' }))}">تصدير إلى Excel (CSV)</button></div>` : ''}</div>
   <div class="card"><form class="filters" data-form="regf" role="search">
     <input type="search" id="f-q" value="${esc(f.q)}" placeholder="${chief ? 'بحث بالاسم' : 'بحث بالاسم أو الهوية أو الهاتف'}" aria-label="بحث">
     ${me.role === 'top' ? `<select id="f-section" aria-label="القسم">${opts(Object.entries(meta.sections), f.section, 'القسمان')}</select>` : ''}
     <select id="f-category" aria-label="الفئة">${opts(pub.categories.map((c) => [c.id, c.name]), f.category, 'كل الفئات')}</select>
     <select id="f-branch" aria-label="الفرع">${opts(trackOpts, f.branch, 'كل الفروع')}</select>
-    <select id="f-status" aria-label="الحالة">${opts(Object.entries(meta.regStatuses), f.status, 'كل الحالات')}</select>
+    <select id="f-status" aria-label="الحالة">${opts([['accepted', 'مسجّل'], ['withdrawn', 'منسحب']], f.status, 'كل الحالات')}</select>
     <button class="btn pri" type="submit">بحث</button></form>
-  <p class="note">${d.total} تسجيلًا</p>
+  <p class="note">${d.total} مسجّلًا</p>
   ${d.rows.length ? `<div class="scroll"><table class="list stack"><thead><tr><th>الاسم</th>${chief ? '' : '<th>الهوية</th><th>الهاتف</th>'}${me.role === 'top' ? '<th>القسم</th>' : ''}<th>الفئة</th><th>المشاركات</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>
   ${d.rows.map((r) => `<tr class="click" data-act="reg" data-id="${r.id}" tabindex="0"><td><b>${esc(r.fullName)}</b></td>${chief ? '' : `<td class="ltr">${esc(r.nationalId)}</td><td class="ltr">${esc(r.phone)}</td>`}${me.role === 'top' ? `<td>${esc(r.sectionName)}</td>` : ''}<td>${esc(r.categoryName)}</td><td>${entryChips(r.entries)}</td><td>${stTag(r.status, r.statusName)}</td><td class="n">${esc(fmtD(r.createdAt))}</td></tr>`).join('')}
   </tbody></table></div>
@@ -305,7 +305,7 @@ async function vRegs() {
     : '<div class="empty"><p>لا توجد تسجيلات مطابقة.</p></div>'}</div>`;
 }
 
-const ACT = { signup: 'إنشاء الحساب', register: 'تأكيد الطلب', edit: 'تعديل من المتسابق', withdraw: 'انسحاب', status: 'تغيير الحالة', correct: 'تصحيح إداري', reset: 'إعادة تعيين كلمة المرور', profile: 'تحديث التواصل', export: 'تصدير', settings: 'إعداد', create: 'إنشاء', update: 'تعديل', activate: 'تفعيل', deactivate: 'إيقاف', seed: 'تهيئة' };
+const ACT = { signup: 'إنشاء الحساب', register: 'التسجيل', edit: 'تعديل من المتسابق', withdraw: 'انسحاب', status: 'تغيير الحالة', correct: 'تصحيح إداري', reset: 'إعادة تعيين كلمة المرور', profile: 'تحديث التواصل', export: 'تصدير', settings: 'إعداد', create: 'إنشاء', update: 'تعديل', activate: 'تفعيل', deactivate: 'إيقاف', seed: 'تهيئة' };
 async function openReg(id) {
   const { registration: r, history } = await api('/registrations/' + id);
   const chief = me.role === 'chief';
@@ -313,11 +313,9 @@ async function openReg(id) {
   modal(r.fullName, `<p class="err" hidden></p>
   <div class="status"><span class="big">${esc(r.statusName)}</span>${stTag(r.status)}<span class="note">${esc(r.sectionName)} · ${esc(r.categoryName)}</span></div>
   ${r.staffNote ? `<p class="banner">${esc(r.staffNote)}</p>` : ''}
-  <dl class="kv">${chief ? '' : `<dt>رقم الهوية</dt><dd class="ltr">${esc(r.nationalId)}</dd><dt>الهاتف</dt><dd class="ltr">${esc(r.phone)}${r.phone2 ? ' · ' + esc(r.phone2) : ''}</dd>`}<dt>سنة الميلاد</dt><dd>${esc(r.birthYear)}</dd><dt>الجنس</dt><dd>${r.gender === 'F' ? 'أنثى' : 'ذكر'}</dd><dt>تاريخ الطلب</dt><dd>${esc(fmt(r.createdAt))}</dd>${r.reviewer ? `<dt>آخر مراجعة</dt><dd>${esc(r.reviewer)} · ${esc(fmt(r.reviewedAt))}</dd>` : ''}</dl>
+  <dl class="kv">${chief ? '' : `<dt>رقم الهوية</dt><dd class="ltr">${esc(r.nationalId)}</dd><dt>الهاتف</dt><dd class="ltr">${esc(r.phone)}${r.phone2 ? ' · ' + esc(r.phone2) : ''}</dd>`}<dt>سنة الميلاد</dt><dd>${esc(r.birthYear)}</dd><dt>الجنس</dt><dd>${r.gender === 'F' ? 'أنثى' : 'ذكر'}</dd><dt>تاريخ التسجيل</dt><dd>${esc(fmt(r.createdAt))}</dd>${r.reviewer ? `<dt>آخر مراجعة</dt><dd>${esc(r.reviewer)} · ${esc(fmt(r.reviewedAt))}</dd>` : ''}</dl>
   <h3>المشاركات</h3>${r.entries.map((e) => `<div class="entry ${e.status === 'active' ? '' : 'off'}"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${e.status === 'active' ? '' : '<span class="tag">ملغاة</span>'}<span class="cur">${esc(e.curriculum)}</span></div>`).join('')}
-  ${act ? `<h3>المراجعة</h3><div class="field"><label for="r-note">ملاحظة للمتسابق</label><textarea id="r-note" placeholder="مطلوبة عند طلب الاستكمال أو عدم القبول">${esc(r.staffNote)}</textarea></div>
-  <div class="acts"><button class="btn okb" data-act="rst" data-id="${r.id}" data-s="accepted">قبول</button><button class="btn" data-act="rst" data-id="${r.id}" data-s="returned">طلب استكمال</button><button class="btn badb" data-act="rst" data-id="${r.id}" data-s="rejected">عدم قبول</button>${r.status !== 'submitted' ? `<button class="btn" data-act="rst" data-id="${r.id}" data-s="submitted">إعادة إلى المراجعة</button>` : ''}</div>
-  <h3>إجراءات إدارية</h3><div class="acts"><button class="btn" data-act="correct" data-id="${r.id}">تصحيح البيانات</button><button class="btn" data-act="reset-c" data-id="${r.id}">إعادة تعيين كلمة مرور المتسابق</button></div>` : ''}
+  ${act ? `<h3>إجراءات إدارية</h3><div class="acts"><button class="btn" data-act="correct" data-id="${r.id}">تصحيح البيانات</button><button class="btn" data-act="reset-c" data-id="${r.id}">إعادة تعيين كلمة مرور المتسابق</button></div>` : ''}
   <h3>السجل</h3><ul class="log">${history.map((h) => `<li><b>${esc(ACT[h.action] || h.action)}</b> — ${esc(h.summary)}${h.reason ? `<br><span>السبب: ${esc(h.reason)}</span>` : ''}<div class="meta">${esc(h.actor || 'المتسابق')} · ${esc(fmt(h.at))}</div></li>`).join('') || '<li class="note">لا يوجد</li>'}</ul>`);
   dlg.dataset.reg = r.id; S.cur = r;
 }
@@ -343,12 +341,12 @@ async function vDash() {
   return `<div class="head"><div><h1>${top ? 'لوحة المتابعة' : 'لوحة القسم'}</h1><p>${esc(c ? c.name + ' · الدورة ' + c.number : '')} · ${top ? (S.dash.section ? esc(meta.sections[S.dash.section]) : 'القسمان') : esc(me.sectionName)} · ${esc(c ? c.state.label : '')}</p></div>
     ${top ? `<div class="acts" role="group" aria-label="القسم">${[['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${S.dash.section === k ? 'pri' : ''}" data-act="dsec" data-s="${k}">${n}</button>`).join('')}</div>` : ''}</div>
   ${f ? `<h2>التصفيات الأولية: اليوم</h2><div class="kpis"><div class="kpi main"><b>${f.persons || 0}</b><span>حاضرون</span></div><div class="kpi"><b>${f.waiting || 0}</b><span>في الانتظار</span></div><div class="kpi"><b>${f.active || 0}</b><span>نودوا أو جارٍ اختبارهم</span></div><div class="kpi"><b>${f.done || 0}</b><span>انتهى اختبارهم</span></div><div class="kpi"><b>${f.needs || 0}</b><span>بانتظار تحديد اللجنة</span></div></div><h2>التسجيل</h2>` : ''}
-  <div class="kpis"><div class="kpi main"><b>${s.total}</b><span>إجمالي التسجيلات</span></div>
-    <div class="kpi"><b>${by(s.byStatus, 'submitted')}</b><span>بانتظار المراجعة</span></div><div class="kpi"><b>${by(s.byStatus, 'returned')}</b><span>مطلوب استكمال</span></div>
-    <div class="kpi"><b>${by(s.byStatus, 'accepted')}</b><span>مقبول</span></div><div class="kpi"><b>${by(s.byStatus, 'rejected') + by(s.byStatus, 'withdrawn')}</b><span>غير مقبول أو منسحب</span></div></div>
+  <div class="kpis"><div class="kpi main"><b>${s.total}</b><span>إجمالي المسجلين</span></div>
+    <div class="kpi"><b>${by(s.byBranch, 'hifz')}</b><span>في الحفظ</span></div><div class="kpi"><b>${by(s.byBranch, 'tilawa')}</b><span>في التلاوة</span></div>
+    <div class="kpi"><b>${by(s.byBranch, 'tafsir')}</b><span>في التفسير</span></div><div class="kpi"><b>${by(s.byStatus, 'withdrawn')}</b><span>منسحبون</span></div></div>
   ${top && !S.dash.section ? `<div class="card"><h2>حسب القسم</h2>${bars(s.bySection.map((x) => ({ k: meta.sections[x.k], n: x.n })), true)}${s.accounts != null ? `<p class="note">حسابات المتسابقين المنشأة: ${s.accounts}</p>` : ''}</div>` : ''}
-  <div class="grid2"><div class="card"><h2>المشاركات حسب الفرع والمسار</h2>${bars(s.byTrack)}</div><div class="card"><h2>التسجيلات حسب الفئة</h2>${bars(s.byCategory, true)}</div></div>
-  <div class="card"><div class="acts"><a class="btn pri" href="#regs">مراجعة التسجيلات</a>${by(s.byStatus, 'submitted') ? `<button class="btn" data-act="pending">عرض ${by(s.byStatus, 'submitted')} بانتظار المراجعة</button>` : ''}</div></div>`;
+  <div class="grid2"><div class="card"><h2>المشاركات حسب الفرع والمسار</h2>${bars(s.byTrack)}</div><div class="card"><h2>المسجلون حسب الفئة</h2>${bars(s.byCategory, true)}</div></div>
+  <div class="card"><div class="acts"><a class="btn pri" href="#regs">قائمة المسجلين</a></div></div>`;
 }
 
 // ---------- إعداد الدورة (الإدارة العليا) ----------
@@ -392,8 +390,8 @@ const currRow = (x, codes, catOpts) => `<tr data-id="${esc(x.id || '')}"><td><se
 async function vUsers() {
   S.users = (await api('/users' + (S.usersRole ? '?role=' + S.usersRole : ''))).users;
   const rows = S.users;
-  return `<div class="head"><div><h1>الحسابات</h1><p>الإدارة العليا تنشئ حسابات الموظفين والمحكمين وتحدد الدور والقسم. المتسابقون ينشئون حساباتهم بأنفسهم.</p></div><div class="acts"><button class="btn pri" data-act="new-user">إضافة حساب</button></div></div>
-  <div class="card"><div class="filters"><select id="u-role" aria-label="الدور">${opts(Object.entries(meta.roles).filter(([k]) => k !== 'contestant'), S.usersRole, 'كل حسابات الموظفين')}<option value="contestant" ${S.usersRole === 'contestant' ? 'selected' : ''}>حسابات المتسابقين</option></select></div>
+  return `<div class="head"><div><h1>حسابات كادر التنظيم والتحكيم</h1><p>الإدارة العليا تنشئ حسابات الإدارة التنفيذية ورؤساء لجان التحكيم والمحكمين ومنسقي النداء وشاشات الانتظار، وتحدد لكل حساب دوره وقسمه وتخصصه. المتسابقون ينشئون حساباتهم بأنفسهم.</p></div><div class="acts"><button class="btn pri" data-act="new-user">إضافة حساب</button></div></div>
+  <div class="card"><div class="filters"><select id="u-role" aria-label="الدور">${opts(Object.entries(meta.roles).filter(([k]) => k !== 'contestant'), S.usersRole, 'كل حسابات الكادر')}<option value="contestant" ${S.usersRole === 'contestant' ? 'selected' : ''}>حسابات المتسابقين</option></select></div>
   ${rows.length ? `<div class="scroll"><table class="list stack"><thead><tr><th>الاسم</th><th>الدخول</th><th>الدور</th><th>القسم</th><th>آخر دخول</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${rows.map((u) => `<tr><td><b>${esc(u.name)}</b>${u.specialty ? `<br><small class="note">${esc(u.specialty)}</small>` : ''}</td><td class="ltr">${esc(u.login)}</td><td>${esc(u.roleName)}</td><td>${esc(u.role === 'contestant' ? '—' : u.sectionName)}</td><td class="n">${esc(fmt(u.lastLogin) || '—')}</td><td>${u.active ? (u.mustChange ? '<span class="tag warn">لم يغيّر كلمة المرور</span>' : '<span class="tag ok">نشط</span>') : '<span class="tag bad">موقوف</span>'}</td>
   <td><div class="acts">${u.role !== 'contestant' ? `<button class="btn sm" data-act="edit-user" data-id="${u.id}">تعديل</button><button class="btn sm" data-act="reset-u" data-id="${u.id}">كلمة مرور مؤقتة</button>` : ''}${u.id !== me.id ? `<button class="btn sm ${u.active ? 'badb' : 'okb'}" data-act="toggle-u" data-id="${u.id}">${u.active ? 'إيقاف' : 'تفعيل'}</button>` : ''}</div></td></tr>`).join('')}
@@ -452,10 +450,10 @@ async function vReception() {
     ${me.role === 'top' ? `<select id="rf-section" aria-label="القسم">${opts(Object.entries(meta.sections), f.section, 'القسمان')}</select>` : ''}
     <select id="rf-category" aria-label="الفئة">${opts(pub.categories.map((x) => [x.id, x.name]), f.category, 'كل الفئات')}</select>
     <select id="rf-state" aria-label="الحضور">${opts([['absent', 'لم يحضروا'], ['present', 'حاضرون']], f.state, 'الجميع')}</select><button class="btn pri" type="submit">بحث</button></form>
-  <p class="note">${d.total} متسابقًا مقبولًا</p>
+  <p class="note">${d.total} مسجّلًا</p>
   ${d.rows.length ? `<div class="scroll"><table class="list stack"><thead><tr><th>الاسم</th><th>الفئة</th><th>المشاركات والحضور</th><th></th></tr></thead><tbody>${d.rows.map(row).join('')}</tbody></table></div>
   <div class="pager"><span class="note">صفحة ${d.page} من ${pages}</span><div class="acts"><button class="btn sm" data-act="rpage" data-p="${d.page - 1}" ${d.page > 1 ? '' : 'disabled'}>السابق</button><button class="btn sm" data-act="rpage" data-p="${d.page + 1}" ${d.page < pages ? '' : 'disabled'}>التالي</button></div></div>`
-    : `<div class="empty"><p>${S.stage === 'prelim' ? 'لا يوجد متسابقون مطابقون. يظهر هنا المقبولون فقط.' : 'لا يوجد متأهلون إلى هذه المرحلة بعد.'}</p></div>`}</div>`;
+    : `<div class="empty"><p>${S.stage === 'prelim' ? 'لا يوجد متسابقون مطابقون.' : 'لا يوجد متأهلون إلى هذه المرحلة بعد.'}</p></div>`}</div>`;
 }
 function checkinForm(r) {
   const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
@@ -609,7 +607,7 @@ function gradeForm() {
       <tr>${items.map((it) => `<th>${esc(it.col || '—')}<small>−${it.d}</small></th>`).join('')}</tr></thead><tbody>
       ${[...Array(R.segments).keys()].map((i) => `<tr><th>${i + 1}</th>${items.map((it) => `<td>${ctr(`s.${i}.${it.k}`, (d.segments[i] || {})[it.k], lock)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="calc">${k.groups.map((g) => `<span>${g.n ? esc(g.n) + ': ' : ''}الخصم ${n2(g.ded)} · الصافي <b>${n2(g.net)}</b> من ${g.base}</span>`).join('')}</div>
-    ${R.extra ? `<div class="field"><span class="lab">${esc(R.extra.n)} <span class="req">*</span></span><div class="acts" role="radiogroup">${R.extra.options.map((o) => `<label class="check opt"><input type="radio" name="fx" data-fx="${R.extra.k}" value="${o}" ${+d[R.extra.k] === o ? 'checked' : ''} ${lock ? 'disabled' : ''}>${o}</label>`).join('')}</div><small>تُضاف فوق المجموع.</small></div>` : ''}`;
+    ${R.extra ? `<div class="field"><span class="lab">${esc(R.extra.n)} <span class="req">*</span></span><div class="acts" role="radiogroup">${R.extra.options.map((o) => `<label class="check opt"><input type="radio" name="fx" data-fx="${R.extra.k}" value="${o}" ${d[R.extra.k] != null && d[R.extra.k] !== '' && +d[R.extra.k] === o ? 'checked' : ''} ${lock ? 'disabled' : ''}>${o}</label>`).join('')}</div><small>تُضاف فوق المجموع.</small></div>` : ''}`;
   } else if (R.kind === 'criteria') {
     body = `<div class="scroll"><table class="list crit"><thead><tr><th>المعيار</th><th class="n">الدرجة المقررة</th><th>الدرجة المستحقة</th><th>المقياس</th></tr></thead><tbody>
       ${R.criteria.map((cr) => `<tr><td><b>${esc(cr.n)}</b>${cr.group ? `<br><small class="note">${esc(cr.group)}</small>` : ''}</td><td class="n">${cr.max}</td><td><select data-fc="${cr.k}" ${lock ? 'disabled' : ''} aria-label="${esc(cr.n)}">${opts(cr.options.map((o) => [o, o]), d[cr.k] ?? '', 'اختر الدرجة')}</select></td><td class="desc">${esc(cr.desc)}</td></tr>`).join('')}</tbody></table></div>
@@ -628,7 +626,7 @@ function gradeForm() {
   return `<div class="head"><div><h1>${esc(R.title)}</h1><p>${esc(c.name)} · ${esc(c.category)} · ${esc(c.branchName)}${c.trackName ? ' · ' + esc(c.trackName) : ''} · ${esc(c.stageName)} · ${esc(c.committee)}${f.slot > 1 ? ' · المحكم ' + f.slot : ''}</p></div><div class="acts"><button class="btn" data-act="fm-back">رجوع إلى القائمة</button></div></div>
   <div class="card"><p class="note">المقرر: ${esc(c.curriculum)} — ${esc(R.note)}</p>${!f.mine ? '<div class="banner">هذه الخانة يرصدها محكم آخر في اللجنة.</div>' : ''}${lock ? '<div class="banner info">أُرسل التقييم وأُقفل. لإعادة فتحه تواصل مع رئيس لجنة التحكيم.</div>' : ''}
   <p class="err" hidden></p>${body}
-  <div class="total-bar"><span>درجتك في هذه الاستمارة</span><b>${n2(k.raw)}</b><span>من ${k.base}</span>${R.extra && d[R.extra.k] ? `<span>· ${esc(R.extra.n)} ${d[R.extra.k]}</span>` : ''}</div>
+  <div class="total-bar"><span>درجتك في هذه الاستمارة</span><b>${n2(k.raw)}</b><span>من ${k.base}</span>${R.extra && d[R.extra.k] != null && d[R.extra.k] !== '' ? `<span>· ${esc(R.extra.n)} ${d[R.extra.k]}</span>` : ''}</div>
   ${lock || !f.mine ? '' : `<label class="check"><input type="checkbox" id="fm-ok">راجعت الاستمارة، وأرغب في إرسالها (لا تُعدَّل بعد الإرسال)</label>
   <div class="acts"><button class="btn" data-act="fm-save">حفظ مسودة</button><button class="btn pri" data-act="fm-submit">إرسال التقييم</button>${f.dirty ? '<span class="tag warn">تعديلات غير محفوظة</span>' : f.version ? '<span class="tag ok">محفوظ على الخادم</span>' : ''}</div>`}</div>`;
 }
@@ -667,7 +665,7 @@ async function vResults() {
     return `<div class="card"><div class="qh"><div><h2>${esc(g.name)}</h2><p class="note">${esc(g.sectionName)} · المكتمل ${g.ranked.length} · غير المكتمل ${g.pending.length}${g.untested ? ` · لم يُختبر بعد ${g.untested}` : ''}${g.nextStage && g.qualifiedCount ? ` · المتأهلون إلى ${esc(g.nextStageName)}: ${g.qualifiedCount}` : ''}</p></div><div class="acts">${st}${acts}</div></div>
     ${g.untested && !g.ranked.length && !g.pending.length ? '<p class="note">لم يبدأ اختبار أحد في هذه المجموعة بعد.</p>' : ''}
     <div class="scroll"><table class="list stack"><thead><tr><th class="n">الترتيب</th><th>المتسابق</th>${g.allAges ? '<th>الفئة</th>' : ''}${parts.map((p) => `<th class="n">${esc(p.n)} (${p.weight})</th>`).join('')}<th class="n">المجموع (${g.max})</th></tr></thead><tbody>
-    ${g.ranked.map((r) => `<tr class="click" data-act="res" data-id="${r.entryId}" tabindex="0"><td class="n"><b>${r.rank}</b>${r.tie ? ' <span class="tag warn">تعادل</span>' : ''}</td><td><b>${esc(r.name)}</b>${r.qualified === 'qualified' ? ` <span class="tag ok">متأهل${r.exceptional ? ' (استثناء)' : ''}</span>` : r.qualified === 'excluded' ? ' <span class="tag">غير متأهل</span>' : ''}</td>${g.allAges ? `<td>${esc(r.category)}</td>` : ''}${r.parts.map((p) => `<td class="n">${n2(p.value)}</td>`).join('')}<td class="n"><b>${n2(r.total)}</b></td></tr>`).join('')}
+    ${g.ranked.map((r) => `<tr class="click" data-act="res" data-id="${r.entryId}" tabindex="0"><td class="n"><b>${r.rank}</b>${r.tie ? ' <span class="tag warn">تعادل</span>' : ''}</td><td><b>${esc(r.name)}</b>${r.tafsir ? (r.tafsir === 'done' ? ' <span class="tag ok">قدّم اختبار التفسير</span>' : ' <span class="tag bad">لم يقدّم اختبار التفسير</span>') : ''}${r.qualified === 'qualified' ? ` <span class="tag ok">متأهل${r.exceptional ? ' (استثناء)' : ''}</span>` : r.qualified === 'excluded' ? ' <span class="tag">غير متأهل</span>' : ''}</td>${g.allAges ? `<td>${esc(r.category)}</td>` : ''}${r.parts.map((p) => `<td class="n">${n2(p.value)}</td>`).join('')}<td class="n"><b>${n2(r.total)}</b></td></tr>`).join('')}
     ${g.pending.map((r) => `<tr class="click pend" data-act="res" data-id="${r.entryId}" tabindex="0"><td class="n">—</td><td><b>${esc(r.name)}</b><br><small class="note">بانتظار: ${r.missing.map((m) => esc(m.n)).join('، ')}</small></td>${g.allAges ? `<td>${esc(r.category)}</td>` : ''}${r.parts.map((p) => `<td class="n">${n2(p.value)}</td>`).join('')}<td class="n"><span class="tag warn">غير مكتملة</span></td></tr>`).join('')}
     </tbody></table></div></div>`; }).join('') : '<div class="card empty"><p>لا توجد نتائج بعد. تظهر هنا بعد حضور المتسابقين وبدء الرصد.</p></div>'}`;
 }
@@ -686,7 +684,77 @@ async function openResult(entryId) {
     ${e.status === 'submitted' ? `<div class="acts"><input id="ro-${e.id}" placeholder="سبب إعادة الفتح" aria-label="سبب إعادة الفتح"><button class="btn sm" data-act="reopen" data-id="${e.id}" data-e="${entryId}">إعادة فتح للمحكم</button></div>` : ''}</div>`).join('') || '<p class="note">لا توجد استمارات بعد.</p>'}`);
 }
 
-const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults };
+// ---------- اختبار التفسير: المتسابق ----------
+const EX = { tick: null, skew: 0 };
+const dt = (t) => (t ? new Date(t).toLocaleString('ar-u-nu-latn-ca-gregory', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '');
+const mmss = (sec) => { sec = Math.max(0, Math.round(sec)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+async function vTests() { return me.role === 'contestant' ? (S.exam ? examView() : myTestsView()) : (S.testId ? testAdmin() : testsAdmin()); }
+async function myTestsView() {
+  const d = await api('/my/tests');
+  return `<div class="head"><div><h1>اختبار التفسير</h1><p>الاختبارات الإلكترونية المرتبطة بمشاركاتك. محاولة واحدة لكل اختبار، ويُحسب الوقت من الخادم.</p></div></div>
+  ${d.tests.length ? d.tests.map((t) => `<div class="card"><div class="qh"><div><h2>${esc(t.title)}</h2><span class="note">${esc(t.kindName)}${t.reference ? ' · المرجع: ' + esc(t.reference) : ''}</span></div>
+    <span class="tag ${t.attempt ? (t.attempt.status === 'submitted' ? 'ok' : 'warn') : t.window.open ? 'info' : ''}">${t.attempt ? (t.attempt.status === 'submitted' ? 'أُرسل' : 'قيد الحل') : esc(t.window.label)}</span></div>
+    <dl class="kv"><dt>عدد الأسئلة</dt><dd>${t.questionCount}</dd><dt>المدة</dt><dd>${t.durationMin} دقيقة</dd>${t.opensAt ? `<dt>يبدأ</dt><dd>${esc(dt(t.opensAt))}</dd>` : ''}${t.closesAt ? `<dt>ينتهي</dt><dd>${esc(dt(t.closesAt))}</dd>` : ''}</dl>
+    ${t.result ? `<p class="myres">النتيجة: <b>${n2(t.result.score)}</b> من ${n2(t.result.max)}${t.result.passed != null ? (t.result.passed ? ' · <span class="tag ok">ناجح</span>' : ' · <span class="tag">لم يبلغ حد النجاح</span>') : ''}</p>` : t.attempt && t.attempt.status === 'submitted' ? '<p class="note">تظهر النتيجة بعد نشرها.</p>' : ''}
+    <div class="acts">${t.attempt && t.attempt.status === 'in_progress' ? `<button class="btn pri" data-act="ex-open" data-id="${t.id}">متابعة الاختبار</button>` : !t.attempt && t.window.open ? `<button class="btn pri" data-act="ex-start" data-id="${t.id}" data-n="${t.durationMin}">ابدأ الاختبار</button>` : ''}</div></div>`).join('')
+    : '<div class="card empty"><p>لا توجد اختبارات متاحة لمشاركاتك الآن. اختبار فرع التفسير لمسجلي الفرع، واختبار تفسير المقطع لمسجلي التلاوة.</p></div>'}`;
+}
+async function openExam(id) { S.exam = await api(`/my/tests/${id}/attempt`); S.exam.id = id; EX.skew = S.exam.now - Date.now(); S.exam.saved = {}; render(); }
+function examView() {
+  const e = S.exam, done = e.status === 'submitted', left = (e.deadline - (Date.now() + EX.skew)) / 1000;
+  clearInterval(EX.tick);
+  if (!done) EX.tick = setInterval(async () => {
+    const l = (S.exam.deadline - (Date.now() + EX.skew)) / 1000, el = $('#ex-timer');
+    if (el) { el.textContent = mmss(l); el.classList.toggle('low', l < 60); }
+    if (l <= 0) { clearInterval(EX.tick); try { await openExam(S.exam.id); toast('انتهى الوقت وأُرسلت إجاباتك المحفوظة'); } catch (x) {} }
+  }, 1000);
+  const answered = e.questions.filter((q) => q.answer != null).length;
+  return `<div class="exam-top"><div><b>${esc(e.title)}</b><span class="note">${esc(e.kindName)}</span></div>${done ? `<span class="tag ok">أُرسل${e.auto ? ' آليًا عند انتهاء الوقت' : ''}</span>` : `<span class="timer" id="ex-timer" aria-live="off">${mmss(left)}</span>`}<span class="note">أُجيب ${answered} من ${e.questions.length}</span></div>
+  ${done ? `<div class="card"><h2>أُرسل الاختبار</h2>${e.result ? `<p class="myres">النتيجة: <b>${n2(e.result.score)}</b> من ${n2(e.result.max)}</p>` : '<p>تظهر النتيجة بعد نشرها من إدارة المسابقة.</p>'}<button class="btn" data-act="ex-back">رجوع</button></div>` : ''}
+  <ol class="qs">${e.questions.map((q, i) => `<li class="card q"><p class="qt"><b>${i + 1}.</b> ${esc(q.text)} <span class="note">(${n2(q.points)} ${q.points === 1 ? 'درجة' : 'درجات'})</span></p>
+    <div class="qo" role="radiogroup" aria-label="السؤال ${i + 1}">${q.options.map((o, k) => `<label class="opt-row"><input type="radio" name="q${q.id}" data-ex="${q.id}" value="${k}" ${q.answer === k ? 'checked' : ''} ${done ? 'disabled' : ''}>${esc(o)}</label>`).join('')}</div>
+    ${done ? '' : `<span class="note" id="sv-${q.id}">${q.answer != null ? 'محفوظ على الخادم' : ''}</span>`}</li>`).join('')}</ol>
+  ${done ? '' : `<div class="card"><p class="err" hidden></p><label class="check"><input type="checkbox" id="ex-ok">راجعت إجاباتي وأرغب في إرسال الاختبار (لا يمكن التعديل بعده)</label><div class="acts"><button class="btn pri" data-act="ex-submit">إرسال الاختبار</button><span class="note">تُحفظ كل إجابة فور اختيارها، ويمكنك إغلاق الصفحة والعودة قبل انتهاء الوقت.</span></div></div>`}`;
+}
+
+// ---------- اختبارات التفسير: الإدارة ----------
+async function testsAdmin() {
+  const d = S.testsData = await api('/tests');
+  const free = d.curricula.filter((c) => !d.tests.some((t) => t.curriculumId === c.id));
+  return `<div class="head"><div><h1>اختبارات التفسير</h1><p>اختبار فرع التفسير لكل فئة، واختبار تفسير المقطع لمتسابقي التلاوة، منفصلان. الأسئلة تُراجع وتُعتمد قبل فتح الاختبار.</p></div>
+    ${me.role === 'top' && free.length ? '<div class="acts"><button class="btn pri" data-act="t-new">إنشاء اختبار</button></div>' : ''}</div>
+  ${d.tests.length ? `<div class="qgrid">${d.tests.map((t) => `<article class="card"><h3>${esc(t.title)}</h3><p class="note">${esc(t.kindName)}<br>${esc(t.curriculum)}</p>
+    <div class="chips"><span class="tag ${t.status === 'open' ? 'ok' : t.status === 'closed' ? '' : 'warn'}">${esc(t.statusName)}</span><span class="tag">الأسئلة المعتمدة ${t.approved} من ${t.questions}</span><span class="tag">المحاولات ${t.attempts}</span>${t.resultsPublished ? '<span class="tag ok">النتائج منشورة</span>' : ''}</div>
+    <div class="acts"><button class="btn sm pri" data-act="t-open" data-id="${t.id}">${me.role === 'exec' ? 'الإنجاز' : me.role === 'top' ? 'إدارة' : 'المراجعة والنتائج'}</button></div></article>`).join('')}</div>` : '<div class="card empty"><p>لا توجد اختبارات بعد.</p></div>'}`;
+}
+const toLocal = (t) => { if (!t) return ''; const d = new Date(t), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+async function testAdmin() {
+  const top = me.role === 'top', review = ['top', 'chief'].includes(me.role);
+  const [det, res] = await Promise.all([review ? api('/tests/' + S.testId) : Promise.resolve(null), api(`/tests/${S.testId}/results`)]);
+  const t = res.test;
+  const qs = det ? det.questions : [];
+  return `<div class="head"><div><h1>${esc(t.title)}</h1><p>${esc(t.kindName)} · ${esc(t.curriculum)}</p></div><div class="acts"><button class="btn" data-act="t-back">كل الاختبارات</button></div></div>
+  ${top ? `<details class="blk" ${t.status === 'draft' ? 'open' : ''}><summary>إعداد الاختبار</summary><form data-form="test" data-id="${t.id}"><p class="err" hidden></p>
+    <div class="row2"><div class="field"><label for="t-title">العنوان</label><input id="t-title" value="${esc(t.title)}" required></div><div class="field"><label for="t-ref">الكتاب المرجعي ونسخته</label><input id="t-ref" value="${esc(t.reference)}"></div></div>
+    <div class="row3"><div class="field"><label for="t-n">عدد الأسئلة لكل متسابق</label><input id="t-n" inputmode="numeric" value="${t.questionCount}"><small>تُسحب عشوائيًا من الأسئلة المعتمدة.</small></div><div class="field"><label for="t-d">المدة (دقيقة)</label><input id="t-d" inputmode="numeric" value="${t.durationMin}"></div><div class="field"><label for="t-p">حد النجاح (اختياري)</label><input id="t-p" inputmode="decimal" value="${esc(t.passMark ?? '')}"><small>لم يُحسم في اللائحة (D05).</small></div></div>
+    <div class="row3"><div class="field"><label for="t-o">يبدأ</label><input id="t-o" type="datetime-local" value="${toLocal(t.opensAt)}"></div><div class="field"><label for="t-c">ينتهي</label><input id="t-c" type="datetime-local" value="${toLocal(t.closesAt)}"></div><div class="field"><label for="t-s">الحالة</label><select id="t-s">${opts([['draft', 'مسودة'], ['open', 'مفتوح'], ['closed', 'مغلق']], t.status)}</select></div></div>
+    <button class="btn pri" type="submit">حفظ</button></form></details>` : ''}
+  ${review ? `<div class="card"><div class="qh"><div><h2>بنك الأسئلة (${qs.length})</h2><p class="note">المعتمد ${t.approved}. السؤال الذي ظهر في محاولة لا يُعدَّل ولا يُحذف.</p></div></div>
+    ${qs.length ? `<ol class="bank">${qs.map((q) => `<li><p><b>${esc(q.text)}</b> <span class="note">(${n2(q.points)})${q.source ? ' · ' + esc(q.source) : ''}</span></p><ul>${q.options.map((o, k) => `<li class="${k === q.correct ? 'right' : ''}">${esc(o)}${k === q.correct ? ' ✓' : ''}</li>`).join('')}</ul>
+      <div class="acts"><span class="tag ${q.status === 'approved' ? 'ok' : 'warn'}">${q.status === 'approved' ? 'معتمد' : 'بانتظار المراجعة'}</span>${q.used ? '<span class="tag">ظهر في محاولة</span>' : `<button class="btn sm ${q.status === 'approved' ? '' : 'okb'}" data-act="q-review" data-id="${q.id}" data-v="${q.status === 'approved' ? 0 : 1}">${q.status === 'approved' ? 'سحب الاعتماد' : 'اعتماد'}</button>${top ? `<button class="btn sm badb" data-act="q-del" data-id="${q.id}">حذف</button>` : ''}`}</div></li>`).join('')}</ol>` : '<p class="note">لا توجد أسئلة بعد.</p>'}
+    ${top ? `<details class="blk"><summary>إضافة سؤال</summary><form data-form="question" data-id="${t.id}"><p class="err" hidden></p>
+      <div class="row3"><div class="field"><label for="qn-t">النوع</label><select id="qn-t">${opts([['mcq', 'اختيار من متعدد'], ['tf', 'صح أو خطأ']], 'mcq')}</select></div><div class="field"><label for="qn-p">الدرجة</label><input id="qn-p" inputmode="decimal" value="1"></div><div class="field"><label for="qn-c">رقم الإجابة الصحيحة</label><input id="qn-c" inputmode="numeric" value="1"><small>في صح أو خطأ: 1 = صح، 2 = خطأ.</small></div></div>
+      <div class="field"><label for="qn-x">نص السؤال</label><textarea id="qn-x" required></textarea></div><div class="field"><label for="qn-o">الخيارات (خيار في كل سطر)</label><textarea id="qn-o"></textarea></div><div class="field"><label for="qn-s">المصدر العلمي</label><input id="qn-s"></div><button class="btn pri" type="submit">إضافة</button></form></details>
+    <details class="blk"><summary>استيراد أسئلة من نص</summary><form data-form="import" data-id="${t.id}"><p class="err" hidden></p><p class="note">افصل بين الأسئلة بسطر فارغ. السطر الأول نص السؤال، ثم الخيارات سطرًا سطرًا، وضع علامة * بعد الإجابة الصحيحة. «صح» و«خطأ» وحدهما يجعلان السؤال صحًّا أو خطأً. سطر «المصدر: …» أو «الدرجة: …» اختياري.</p>
+      <textarea id="im-x" rows="10" class="ltr-no" placeholder="كم عدد آيات سورة النبأ؟&#10;أ) 30&#10;ب) 40 *&#10;ج) 50&#10;&#10;سورة النبأ مكية&#10;صح *&#10;خطأ"></textarea><button class="btn pri" type="submit">استيراد</button></form></details>` : ''}</div>` : ''}
+  <div class="card"><div class="qh"><div><h2>${review ? 'النتائج' : 'الإنجاز'}</h2><p class="note">${review ? 'الترتيب بالدرجة ثم بزمن الحل المحسوب من الخادم.' : 'حالة الإنجاز دون الدرجات.'}</p></div>
+    ${top ? `<button class="btn sm" data-act="t-pub" data-id="${t.id}" data-p="${t.resultsPublished ? 0 : 1}" ${t.status === 'closed' ? '' : 'disabled title="أغلق الاختبار أولًا"'}>${t.resultsPublished ? 'إيقاف نشر النتائج' : 'نشر النتائج للمتسابقين'}</button>` : ''}</div>
+    ${res.rows.length ? `<table class="list stack"><thead><tr>${review ? '<th class="n">الترتيب</th>' : ''}<th>المتسابق</th><th>القسم</th><th>الحالة</th>${review ? '<th class="n">الدرجة</th><th class="n">زمن الحل</th>' : ''}</tr></thead><tbody>
+      ${res.rows.sort((a, b) => (a.rank || 999) - (b.rank || 999)).map((r) => `<tr>${review ? `<td class="n">${r.rank || '—'}</td>` : ''}<td>${esc(r.name)}</td><td>${esc(r.sectionName)}</td><td><span class="tag ${r.status === 'submitted' ? 'ok' : 'warn'}">${r.status === 'submitted' ? 'أُنجز' : 'قيد الحل'}</span>${r.auto ? ' <span class="tag">إرسال آلي</span>' : ''}</td>${review ? `<td class="n">${r.score != null ? `${n2(r.score)} / ${n2(r.max)}` : '—'}${r.passed === false ? ' <span class="tag">دون الحد</span>' : ''}</td><td class="n">${r.seconds != null ? mmss(r.seconds) : '—'}</td>` : ''}</tr>`).join('')}</tbody></table>` : '<p class="note">لم يبدأ أحد بعد.</p>'}
+    ${res.notStarted.length ? `<details><summary class="note">لم يبدؤوا (${res.notStarted.length})</summary><p>${res.notStarted.map((x) => esc(x.name)).join('، ')}</p></details>` : ''}</div>`;
+}
+
+const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults, tests: vTests };
 
 // ---------- الأحداث ----------
 const val = (id) => (document.getElementById(id) || {}).value || '';
@@ -711,7 +779,7 @@ document.addEventListener('click', async (e) => {
       const w = S.wz;
       try {
         await api('/my/registration', { method: 'POST', body: { birthYear: w.year, gender: w.gender, phone2: w.phone2, entries: Object.entries(w.picks).map(([branch, track]) => ({ branch, track })) } });
-        S.wz = null; toast(w.edit ? 'حُفظ التعديل' : 'تم استلام طلبك بنجاح'); render();
+        S.wz = null; toast(w.edit ? 'حُفظ التعديل' : 'تم تسجيلك بنجاح'); render();
       } catch (err) { b.disabled = false; showErr($('#view .err'), err); } finally { busy = false; }
     }
     else if (a === 'withdraw') modal('الانسحاب من المسابقة', `<p>يُسجَّل انسحابك من جميع مشاركاتك في هذه الدورة، ويبقى طلبك محفوظًا في السجل. لا يمكنك التراجع عنه من حسابك.</p><form data-form="withdraw"><p class="err" hidden></p><div class="field"><label for="wd-r">السبب (اختياري)</label><textarea id="wd-r"></textarea></div><div class="acts"><button class="btn badb" type="submit">تأكيد الانسحاب</button><button class="btn" type="button" data-act="close">تراجع</button></div></form>`);
@@ -724,11 +792,6 @@ document.addEventListener('click', async (e) => {
     }
     else if (a === 'reg') await openReg(+id);
     else if (a === 'page') { S.regs.page = +b.dataset.p; render(); }
-    else if (a === 'pending') { Object.assign(S.regs, { status: 'submitted', page: 1 }); go('regs'); }
-    else if (a === 'rst') {
-      const r = await api(`/registrations/${id}/status`, { method: 'POST', body: { status: b.dataset.s, note: val('r-note') } });
-      toast('الحالة: ' + r.registration.statusName); await openReg(+id); if (view === 'regs' || view === 'dash') render();
-    }
     else if (a === 'correct') correctForm(S.cur);
     else if (a === 'reset-c') { const r = await api(`/registrations/${id}/reset-password`, { method: 'POST' }); pwBox('كلمة مرور مؤقتة للمتسابق', r.login, r.tempPassword); }
     else if (a === 'dsec') { S.dash.section = b.dataset.s; render(); }
@@ -741,6 +804,24 @@ document.addEventListener('click', async (e) => {
     else if (a === 'edit-user') { userForm(S.users.find((u) => u.id === +id)); specToggle(); }
     else if (a === 'reset-u') { const u = S.users.find((x) => x.id === +id); const r = await api(`/users/${id}/reset`, { method: 'POST' }); pwBox('كلمة مرور مؤقتة', u.login, r.tempPassword); }
     else if (a === 'toggle-u') { const u = S.users.find((x) => x.id === +id); await api('/users/' + id, { method: 'PATCH', body: { active: !u.active } }); toast(u.active ? 'أُوقف الحساب' : 'فُعّل الحساب'); render(); }
+    // اختبار التفسير
+    else if (a === 'ex-start') modal('بدء الاختبار', `<p>يبدأ احتساب الوقت (${esc(b.dataset.n)} دقيقة) فور البدء، ولا يتوقف إذا أغلقت الصفحة. تُحفظ كل إجابة فور اختيارها، وتُرسل إجاباتك المحفوظة آليًا عند انتهاء الوقت.</p><div class="acts"><button class="btn pri" data-act="ex-go" data-id="${id}">ابدأ الآن</button><button class="btn" data-act="close">ليس الآن</button></div>`);
+    else if (a === 'ex-go') { await api(`/my/tests/${id}/start`, { method: 'POST' }); closeModal(); await openExam(+id); }
+    else if (a === 'ex-open') await openExam(+id);
+    else if (a === 'ex-back') { S.exam = null; clearInterval(EX.tick); render(); }
+    else if (a === 'ex-submit') {
+      if (!($('#ex-ok') || {}).checked) return showErr($('#view .err'), new Error('أكّد مراجعة إجاباتك قبل الإرسال'));
+      await api(`/my/tests/${S.exam.id}/submit`, { method: 'POST' }); toast('أُرسل الاختبار'); await openExam(S.exam.id);
+    }
+    else if (a === 't-new') { const free = S.testsData.curricula.filter((c) => !S.testsData.tests.some((t) => t.curriculumId === c.id));
+      modal('إنشاء اختبار', `<form data-form="testnew"><p class="err" hidden></p><div class="field"><label for="tn-c">المقرر</label><select id="tn-c">${opts(free.map((c) => [c.id, (c.kind === 'branch' ? 'فرع التفسير — ' : 'تفسير مقطع التلاوة — ') + c.name]), '')}</select></div>
+        <div class="field"><label for="tn-t">العنوان</label><input id="tn-t" required></div><div class="row2"><div class="field"><label for="tn-n">عدد الأسئلة</label><input id="tn-n" inputmode="numeric" value="10"></div><div class="field"><label for="tn-d">المدة (دقيقة)</label><input id="tn-d" inputmode="numeric" value="20"></div></div>
+        <div class="acts"><button class="btn pri" type="submit">إنشاء</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`); }
+    else if (a === 't-open') { S.testId = +id; render(); }
+    else if (a === 't-back') { S.testId = null; render(); }
+    else if (a === 'q-review') { await api(`/questions/${id}/review`, { method: 'POST', body: { approve: b.dataset.v === '1' } }); render(); }
+    else if (a === 'q-del') { await api('/questions/' + id, { method: 'DELETE' }); toast('حُذف السؤال'); render(); }
+    else if (a === 't-pub') { await api(`/tests/${id}/publish`, { method: 'POST', body: { publish: b.dataset.p === '1' } }); toast(b.dataset.p === '1' ? 'نُشرت النتائج' : 'أُوقف النشر'); render(); }
     else if (a === 'stage') { S.stage = b.dataset.s; S.fm = null; render(); }
     else if (a === 'approve') { const g = S.resData.groups[+b.dataset.g]; await api('/results/approve', { method: 'POST', body: { stage: S.stage, groupKey: g.key } }); toast('اعتُمد الكشف: ' + g.name); render(); }
     else if (a === 'publish') { await api('/results/publish', { method: 'POST', body: { sheetId: +id, publish: b.dataset.p === '1' } }); toast(b.dataset.p === '1' ? 'نُشر الكشف للمتسابقين' : 'أُوقف النشر'); render(); }
@@ -808,6 +889,12 @@ document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'u-r') specToggle();
   if (t.id === 'u-role') { S.usersRole = t.value; render(); }
+  if (t.dataset.ex && S.exam) {
+    const qid = +t.dataset.ex, sv = $('#sv-' + qid); if (sv) sv.textContent = 'جارٍ الحفظ…';
+    api(`/my/tests/${S.exam.id}/answer`, { method: 'PUT', body: { questionId: qid, choice: +t.value } })
+      .then(() => { const q = S.exam.questions.find((x) => x.id === qid); q.answer = +t.value; if (sv) sv.textContent = 'محفوظ على الخادم'; const n = S.exam.questions.filter((x) => x.answer != null).length, el = $('.exam-top .note:last-child'); if (el) el.textContent = `أُجيب ${n} من ${S.exam.questions.length}`; })
+      .catch((err) => { if (sv) { sv.textContent = 'لم يُحفظ: ' + err.message; sv.classList.add('bad'); } });
+  }
   if (t.id === 'scr-stage') { S.stage = t.value; SCR.first = true; SCR.last = 0; repaint(); }
   if (t.dataset.qd && S.qprev) { const r = S.qprev.rows.find((x) => x.entryId === +t.dataset.qd); const box = $('#qrw-' + t.dataset.qd); if (box) box.hidden = !(r.tieAtCut || t.checked !== r.proposed); }
   if (['rs-section', 'rs-branch'].includes(t.id)) { S.res[t.id.slice(3)] = t.value; render(); }
@@ -851,6 +938,18 @@ document.addEventListener('submit', async (e) => {
     }
     else if (k === 'withdraw') { await api('/my/withdraw', { method: 'POST', body: { reason: val('wd-r') } }); closeModal(); toast('سُجّل انسحابك'); render(); }
     else if (k === 'phones') { await api('/my/profile', { method: 'PATCH', body: { phone: val('ph-1'), phone2: val('ph-2') } }); closeModal(); toast('حُفظت أرقام التواصل'); render(); }
+    else if (k === 'testnew') { const r = await api('/tests', { method: 'POST', body: { curriculumId: val('tn-c'), title: val('tn-t'), questionCount: val('tn-n'), durationMin: val('tn-d') } }); closeModal(); S.testId = r.test.id; render(); }
+    else if (k === 'test') {
+      const ts = (v) => (v ? new Date(v).getTime() : null);
+      await api('/tests/' + f.dataset.id, { method: 'PUT', body: { title: val('t-title'), reference: val('t-ref'), questionCount: val('t-n'), durationMin: val('t-d'), passMark: val('t-p'), opensAt: ts(val('t-o')), closesAt: ts(val('t-c')), status: val('t-s') } });
+      toast('حُفظ الاختبار'); render();
+    }
+    else if (k === 'question') {
+      const type = val('qn-t'), c = (parseInt(val('qn-c'), 10) || 1) - 1;
+      await api(`/tests/${f.dataset.id}/questions`, { method: 'POST', body: { type, text: val('qn-x'), options: val('qn-o').split('\n'), correct: c, points: val('qn-p'), source: val('qn-s') } });
+      toast('أُضيف السؤال، وينتظر الاعتماد'); render();
+    }
+    else if (k === 'import') { const r = await api(`/tests/${f.dataset.id}/import`, { method: 'POST', body: { text: val('im-x') } }); toast(`استُورد ${r.imported} سؤالًا، وتنتظر الاعتماد`); render(); }
     else if (k === 'qprev') {
       const g = S.resData.groups[+f.dataset.g];
       const p = S.qprev = await api('/qualify/preview', { method: 'POST', body: { stage: S.stage, groupKey: g.key, mode: val('q-mode'), value: val('q-val') } });

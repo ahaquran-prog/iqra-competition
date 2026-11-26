@@ -188,9 +188,10 @@ app.get('/api/stats', need(canSeeRegs), wrap((req) => {
   const c = comp(), sec = scope(req.user, req.query.section);
   const w = 'r.comp_id=?' + (sec ? ' AND r.section=?' : ''), a = sec ? [c.id, sec] : [c.id];
   return {
-    total: db.prepare(`SELECT COUNT(*) n FROM registrations r WHERE ${w}`).get(...a).n,
+    total: db.prepare(`SELECT COUNT(*) n FROM registrations r WHERE ${w} AND r.status='accepted'`).get(...a).n,
     bySection: db.prepare(`SELECT section k, COUNT(*) n FROM registrations r WHERE ${w} GROUP BY section`).all(...a),
     byStatus: db.prepare(`SELECT status k, COUNT(*) n FROM registrations r WHERE ${w} GROUP BY status`).all(...a),
+    byBranch: db.prepare(`SELECT e.branch k, COUNT(*) n FROM entries e JOIN registrations r ON r.id=e.registration_id WHERE ${w} AND e.status='active' AND r.status='accepted' GROUP BY e.branch`).all(...a),
     byCategory: db.prepare(`SELECT category_name k, COUNT(*) n FROM registrations r WHERE ${w} AND r.status<>'withdrawn' GROUP BY category_name ORDER BY n DESC`).all(...a),
     byTrack: db.prepare(`SELECT e.branch_name||CASE WHEN e.track_name<>'' THEN ' — '||e.track_name ELSE '' END k, COUNT(*) n FROM entries e JOIN registrations r ON r.id=e.registration_id
       WHERE ${w} AND e.status='active' AND r.status<>'withdrawn' GROUP BY k ORDER BY n DESC`).all(...a),
@@ -212,8 +213,8 @@ app.get('/api/my', onlyContestant, wrap((req) => {
     competition: c ? compJson(c) : null,
     registration: r ? regJson(r) : null,
     canRegister: !r && st.open,
-    canEdit: !!r && st.open && st.editable && ['submitted', 'returned'].includes(r.status),
-    canWithdraw: !!r && ['submitted', 'returned', 'accepted'].includes(r.status),
+    canEdit: !!r && st.open && st.editable && r.status === 'accepted' && !db.prepare("SELECT 1 FROM tickets WHERE registration_id=? AND status<>'cancelled'").get(r.id),
+    canWithdraw: !!r && r.status === 'accepted',
   };
 }));
 
@@ -255,16 +256,17 @@ app.post('/api/my/registration', onlyContestant, wrap((req) => {
     let r = db.prepare('SELECT * FROM registrations WHERE comp_id=? AND person_id=?').get(c.id, p.id);
     if (!r) {
       const rid = db.prepare(`INSERT INTO registrations(comp_id,person_id,section,category_id,category_name,birth_year,status,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,'submitted',?,?)`).run(c.id, p.id, section, cat.category.id, cat.category.name, year, now, now).lastInsertRowid;
+        VALUES (?,?,?,?,?,?,'accepted',?,?)`).run(c.id, p.id, section, cat.category.id, cat.category.name, year, now, now).lastInsertRowid;
       for (const e of chosen) db.prepare(`INSERT INTO entries(registration_id,branch,branch_name,track,track_name,curriculum_id,curriculum_text,status,created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,'active',?,?)`).run(rid, e.branch, e.branchName, e.track, e.trackName, e.curriculumId, e.curriculum, now, now);
-      audit(req.user, 'register', 'registration', rid, { section, summary: 'تأكيد طلب التسجيل: ' + chosen.map((e) => e.branchName).join('، '), after: { category: cat.category.name, entries: chosen } });
+      audit(req.user, 'register', 'registration', rid, { section, summary: 'التسجيل في: ' + chosen.map((e) => e.branchName).join('، '), after: { category: cat.category.name, entries: chosen } });
       return rid;
     }
-    // طلب قائم: التعديل مسموح فقط قبل المراجعة وضمن موعد التعديل
-    if (!st.editable || !['submitted', 'returned'].includes(r.status)) throw new Bad('لا يمكن تعديل الطلب في حالته الحالية. تواصل مع الإدارة التنفيذية.', 409);
+    // تسجيل قائم: التعديل ضمن موعد التعديل وقبل تثبيت أي حضور
+    if (!st.editable || r.status !== 'accepted') throw new Bad('انتهت مدة تعديل التسجيل. تواصل مع الإدارة التنفيذية.', 409);
+    if (db.prepare("SELECT 1 FROM tickets WHERE registration_id=? AND status<>'cancelled'").get(r.id)) throw new Bad('لا يُعدَّل التسجيل بعد تثبيت حضورك. تواصل مع الإدارة التنفيذية.', 409);
     const old = entriesOf(r.id);
-    db.prepare("UPDATE registrations SET section=?, category_id=?, category_name=?, birth_year=?, status='submitted', updated_at=? WHERE id=?").run(section, cat.category.id, cat.category.name, year, now, r.id);
+    db.prepare("UPDATE registrations SET section=?, category_id=?, category_name=?, birth_year=?, updated_at=? WHERE id=?").run(section, cat.category.id, cat.category.name, year, now, r.id);
     for (const e of old) if (!chosen.some((x) => x.branch === e.branch) && e.status === 'active')
       db.prepare("UPDATE entries SET status='withdrawn', updated_at=? WHERE id=?").run(now, e.id); // لا يحذف السجل التاريخي
     for (const e of chosen) {
@@ -273,7 +275,7 @@ app.post('/api/my/registration', onlyContestant, wrap((req) => {
       else db.prepare(`INSERT INTO entries(registration_id,branch,branch_name,track,track_name,curriculum_id,curriculum_text,status,created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,'active',?,?)`).run(r.id, e.branch, e.branchName, e.track, e.trackName, e.curriculumId, e.curriculum, now, now);
     }
-    audit(req.user, 'edit', 'registration', r.id, { section, summary: 'تعديل الطلب من المتسابق', before: { birthYear: before.birth_year, gender: before.gender, category: r.category_name, entries: old }, after: { birthYear: year, gender: b.gender, category: cat.category.name, entries: chosen } });
+    audit(req.user, 'edit', 'registration', r.id, { section, summary: 'تعديل التسجيل من المتسابق', before: { birthYear: before.birth_year, gender: before.gender, category: r.category_name, entries: old }, after: { birthYear: year, gender: b.gender, category: cat.category.name, entries: chosen } });
     return r.id;
   })();
   return { registration: regJson(db.prepare(regSelect + ' WHERE r.id=?').get(out)) };
@@ -283,7 +285,7 @@ app.post('/api/my/withdraw', onlyContestant, wrap((req) => {
   const c = comp(), p = myPerson(req.user);
   const r = p && db.prepare('SELECT * FROM registrations WHERE comp_id=? AND person_id=?').get(c.id, p.id);
   if (!r) throw new Bad('لا يوجد طلب', 404);
-  if (!['submitted', 'returned', 'accepted'].includes(r.status)) throw new Bad('لا يمكن الانسحاب في حالة الطلب الحالية');
+  if (r.status !== 'accepted') throw new Bad('لا يمكن الانسحاب في حالة التسجيل الحالية');
   const reason = str(req.body.reason, 300, 'سبب الانسحاب', false);
   db.prepare("UPDATE registrations SET status='withdrawn', updated_at=? WHERE id=?").run(Date.now(), r.id);
   audit(req.user, 'withdraw', 'registration', r.id, { section: r.section, summary: 'انسحاب المتسابق', before: { status: r.status }, after: { status: 'withdrawn' }, reason });
@@ -303,17 +305,6 @@ app.patch('/api/my/profile', onlyContestant, wrap((req) => {
 }));
 
 // ---------- التسجيلات: إدارة (الإدارة التنفيذية لقسمها والعليا للقسمين) ----------
-app.post('/api/registrations/:id/status', need(canManageRegs), wrap((req) => {
-  const r = loadReg(req, +req.params.id), b = req.body || {};
-  if (!['submitted', 'returned', 'accepted', 'rejected'].includes(b.status)) throw new Bad('حالة غير صحيحة');
-  if (r.status === 'withdrawn') throw new Bad('الطلب منسحب ولا يمكن تغيير حالته');
-  const note = str(b.note, 500, 'الملاحظة', ['returned', 'rejected'].includes(b.status));
-  if (b.status === r.status && note === r.staff_note) return { registration: regJson(r, req.user) };
-  db.prepare('UPDATE registrations SET status=?, staff_note=?, reviewed_by=?, reviewed_at=?, updated_at=? WHERE id=?').run(b.status, note, req.user.id, Date.now(), Date.now(), r.id);
-  audit(req.user, 'status', 'registration', r.id, { section: r.section, summary: `${REG_ST[r.status]} ← ${REG_ST[b.status]}`, before: { status: r.status, note: r.staff_note }, after: { status: b.status, note }, reason: note });
-  return { registration: regJson(db.prepare(regSelect + ' WHERE r.id=?').get(r.id), req.user) };
-}));
-
 // تصحيح إداري موثق: بدون confirm يعيد الأثر فقط، ومع confirm وسبب يُطبَّق
 app.post('/api/registrations/:id/correct', need(canManageRegs), wrap((req) => {
   const r = loadReg(req, +req.params.id), b = req.body || {}, c = comp();
@@ -555,6 +546,8 @@ app.get('/api/audit', need(isTop), wrap((req) => {
 require('./lib/field')(app);
 // الرصد والنتائج
 require('./lib/judging')(app);
+// اختبار التفسير الإلكتروني
+require('./lib/tests')(app);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'غير موجود' }));
 

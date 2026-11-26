@@ -50,7 +50,7 @@ const people = [
   ['1000000012', 'مريم يوسف خليل الزين', '0500000012', 2016, 'F', [['hifz', 'cat'], ['tilawa', 'tadweer'], ['tafsir', 'main']], 'submitted'],
   ['1000000013', 'سارة عبدالله ناصر الحسن', '0500000013', 2020, 'F', [['hifz', 'cat']], 'submitted'],
   ['1000000014', 'نورة سعد فهد العتيق', '0500000014', 1998, 'F', [['tilawa', 'tartil']], 'accepted'],
-  ['1000000015', 'هاجر علي إبراهيم السيد', '0500000015', 2023, 'F', [['hifz', 'cat']], 'rejected'],
+  ['1000000015', 'هاجر علي إبراهيم السيد', '0500000015', 2023, 'F', [['hifz', 'cat']], 'withdrawn'],
 ];
 
 // متسابقون إضافيون مقبولون لتعبئة الطوابير
@@ -78,8 +78,7 @@ function client(base) {
     const c = client(base);
     await c('POST', '/api/signup', { nationalId: nid, fullName: name, phone, password: PASS });
     const r = await c('POST', '/api/my/registration', { birthYear: year, gender: g, entries: entries.map(([branch, track]) => ({ branch, track })) });
-    const note = status === 'returned' ? 'يرجى التأكد من سنة الميلاد وإرفاق صورة الهوية لدى الإدارة' : status === 'rejected' ? 'سنة الميلاد خارج الفئات المعتمدة في هذه الدورة' : '';
-    if (status !== 'submitted') await mgr[g]('POST', `/api/registrations/${r.registration.id}/status`, { status, note });
+    if (status === 'withdrawn') await c('POST', '/api/my/withdraw', { reason: 'ظرف عائلي' });
   }
   // اللجان: تكليف المحكمين والمنسق، ثم حضور معظم المقبولين وبعض النداءات
   const adm = client(base); await adm('POST', '/api/login', { login: 'admin', password: PASS });
@@ -160,6 +159,25 @@ function client(base) {
   await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid('coord.m'), kind: 'coordinator' });
   const rs = await mgr.M('GET', '/api/reception?stage=semi');
   for (const r of rs.rows) await mgr.M('POST', '/api/checkin', { registrationId: r.id, stage: 'semi', items: r.entries.map((e) => ({ entryId: e.id })) });
+  // اختبارات التفسير: أسئلة تجريبية للعرض فقط، وليست بنك الأسئلة المعتمد
+  const tl = await adm('GET', '/api/tests');
+  const curB = tl.curricula.find((x) => x.kind === 'branch' && x.name.includes('الشباب'));
+  const curP = tl.curricula.find((x) => x.kind === 'passage' && x.name.includes('ترتيل') && x.name.includes('اليافعون'));
+  const tB = (await adm('POST', '/api/tests', { curriculumId: curB.id, title: 'اختبار فرع التفسير — الشباب (سورة الصافات)', reference: 'يُحدَّد الكتاب المرجعي ونسخته قبل الاختبار الفعلي', questionCount: 5, durationMin: 15 })).test;
+  await adm('POST', `/api/tests/${tB.id}/import`, { text: [
+    'كم عدد آيات سورة الصافات؟\nأ) 112\nب) 182 *\nج) 128\nد) 200\nالمصدر: المصحف الشريف',
+    'سورة الصافات مكية\nصح *\nخطأ',
+    'ما ترتيب سورة الصافات في المصحف؟\nأ) 36\nب) 37 *\nج) 38',
+    'تقع سورة الصافات بين سورتي:\nأ) يس وص *\nب) ص والزمر\nج) فاطر ويس',
+    'تبدأ سورة الصافات بالقسم\nصح *\nخطأ',
+    'السورة التي تلي الصافات في ترتيب المصحف:\nأ) الزمر\nب) ص *\nج) غافر',
+  ].join('\n\n') });
+  for (const q of (await chief('GET', `/api/tests/${tB.id}`)).questions) await chief('POST', `/api/questions/${q.id}/review`, { approve: true });
+  await adm('PUT', `/api/tests/${tB.id}`, { ...tB, status: 'open' });
+  const tP = (await adm('POST', '/api/tests', { curriculumId: curP.id, title: 'اختبار تفسير مقطع الترتيل — اليافعون (الزخرف 1–7)', questionCount: 3, durationMin: 10 })).test;
+  await adm('POST', `/api/tests/${tP.id}/import`, { text: ['سورة الزخرف مكية\nصح *\nخطأ', 'تبدأ سورة الزخرف بالحروف المقطعة\nصح *\nخطأ', 'كم عدد آيات سورة الزخرف؟\nأ) 89 *\nب) 99\nج) 75'].join('\n\n') });
+  for (const q of (await chief('GET', `/api/tests/${tP.id}`)).questions) await chief('POST', `/api/questions/${q.id}/review`, { approve: true });
+  await adm('PUT', `/api/tests/${tP.id}`, { ...tP, status: 'open' });
   srv.close();
   db.prepare('DELETE FROM sessions').run();
   db.pragma('wal_checkpoint(TRUNCATE)');

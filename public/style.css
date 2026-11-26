@@ -291,3 +291,17 @@ tr.pend td{background:#fffaf0}
 .scr-stage{width:auto;min-height:36px;padding:4px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
 .scr-stage option{color:#000}
 .myres{grid-column:1/-1;margin:6px 0 0;background:var(--soft);border-radius:10px;padding:10px 12px}
+
+/* اختبار التفسير */
+.exam-top{position:sticky;top:calc(var(--hh,0px) + 8px);z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--plum);color:#fff;border-radius:14px;padding:12px 18px;margin-bottom:16px}
+.exam-top .note{color:#d9cce9}.exam-top b{display:block;font:600 18px "Reem Kufi"}
+.timer{font:700 30px "IBM Plex Sans Arabic";font-variant-numeric:tabular-nums;color:var(--gold);direction:ltr}
+.timer.low{color:#ff9b8f;animation:flash 1s infinite}
+.qs{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.q .qt{font-size:18px}
+.qo{display:grid;gap:8px;margin-bottom:6px}
+.opt-row{display:flex;gap:10px;align-items:center;min-height:48px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;font-size:17px}
+.opt-row:has(input:checked){border-color:var(--plum3);background:var(--soft)}
+.note.bad{color:var(--bad)}
+.bank{padding-inline-start:20px}.bank>li{padding:10px 0;border-bottom:1px solid var(--line)}
+.bank ul{margin:4px 0 8px;padding-inline-start:18px}.bank li.right{color:var(--ok);font-weight:700}
