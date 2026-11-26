@@ -41,7 +41,7 @@ window.fetch = async (input, init = {}) => {
   await app.handle(req, res);
   const sc = res.headers['set-cookie'];
   if (sc) { const v = String(sc).split(';')[0]; jar = /Max-Age=0/.test(sc) ? '' : v; try { sessionStorage.setItem(JAR, jar); } catch (e) {} }
-  if (method !== 'GET' && globalThis.__iqraDb) globalThis.__iqraDb.save();
+  if (method !== 'GET' && globalThis.__iqraDb) { globalThis.__iqraDb.save(); if (globalThis.__iqraSaveFail) setTimeout(() => alertBox('امتلأت مساحة التجربة في متصفحك، فلن تبقى آخر عملية بعد إعادة تحميل الصفحة. احذف بعض المذكرات المرفوعة أو أعد البيانات إلى البداية.'), 4000); }
   return new Response(res.body, { status: res.statusCode, headers: { 'content-type': res.headers['content-type'] || 'text/plain; charset=utf-8' } });
 };
 

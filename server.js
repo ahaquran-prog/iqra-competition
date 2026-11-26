@@ -25,7 +25,14 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   next();
 });
-app.use(express.json({ limit: '200kb' }));
+// رفع المذكرات وحده يقبل طلبًا كبيرًا (الملف بترميز base64)، وبقية الطلبات محدودة
+const bigJson = express.json({ limit: Math.ceil(config.materialMaxMB * 1.4 + 1) + 'mb' }), smallJson = express.json({ limit: '200kb' });
+app.use((req, res, next) => ((req.method === 'POST' || req.method === 'PUT') && /^\/api\/admin\/materials(\/\d+\/file)?$/.test(req.path) ? bigJson : smallJson)(req, res, next));
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'حجم الطلب أكبر من المسموح' });
+  if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'صيغة الطلب غير صحيحة' });
+  next(err);
+});
 app.use(auth.loadUser);
 app.use('/api', auth.csrf);
 app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
@@ -418,6 +425,8 @@ app.put('/api/admin/categories', need(isTop), wrap((req) => {
     for (const o of old) if (!items.some((x) => x.id === o.id)) {
       if (db.prepare('SELECT 1 FROM registrations WHERE category_id=?').get(o.id) || db.prepare('SELECT 1 FROM curricula WHERE category_id=?').get(o.id))
         throw new Bad(`لا يمكن حذف فئة «${o.name}»: عليها تسجيلات أو مقررات`);
+      if (db.prepare('SELECT 1 FROM materials WHERE category_id=? AND deleted_at IS NULL').get(o.id)) throw new Bad(`لا يمكن حذف فئة «${o.name}»: عليها مذكرات؛ عدّلها أو احذفها أولًا`);
+      db.prepare('UPDATE materials SET category_id=NULL WHERE category_id=? AND deleted_at IS NOT NULL').run(o.id);
       db.prepare('DELETE FROM categories WHERE id=?').run(o.id);
     }
     // أسماء مؤقتة لتجنب تعارض القيد الفريد عند تبادل الأسماء
@@ -452,6 +461,8 @@ app.put('/api/admin/curricula', need(isTop), wrap((req) => {
   db.transaction(() => {
     for (const o of old) if (!items.some((x) => x.id === o.id)) {
       if (db.prepare("SELECT 1 FROM entries WHERE curriculum_id=? AND status='active'").get(o.id)) throw new Bad(`لا يمكن حذف مقرر «${o.content}»: عليه مشاركات قائمة`);
+      if (db.prepare('SELECT 1 FROM materials WHERE curriculum_id=? AND deleted_at IS NULL').get(o.id)) throw new Bad(`لا يمكن حذف مقرر «${o.content}»: عليه مذكرات؛ عدّلها أو احذفها أولًا`);
+      db.prepare('UPDATE materials SET curriculum_id=NULL WHERE curriculum_id=? AND deleted_at IS NOT NULL').run(o.id);
       db.prepare('DELETE FROM curricula WHERE id=?').run(o.id);
     }
     for (const x of items) {
@@ -553,6 +564,7 @@ require('./lib/field')(app);
 require('./lib/judging')(app);
 // اختبار التفسير الإلكتروني
 require('./lib/tests')(app);
+require('./lib/materials').routes(app);
 // الإشعارات ومواعيد المراحل
 const N = require('./lib/notify');
 N.routes(app);

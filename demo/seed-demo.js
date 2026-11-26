@@ -8,6 +8,7 @@ const outFile = process.argv[2];
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'iqra-demo-'));
 process.env.DATA_DIR = tmp;
 process.env.SIGNUP_LIMIT = '10000';
+process.env.BLOBS_IN_DB = '1'; // ملفات المذكرات داخل القاعدة التجريبية
 const app = require('../server');
 const db = require('../lib/db');
 const auth = require('../lib/auth');
@@ -184,6 +185,15 @@ function client(base) {
   await adm('POST', `/api/tests/${tP.id}/import`, { text: ['سورة الزخرف مكية\nصح *\nخطأ', 'تبدأ سورة الزخرف بالحروف المقطعة\nصح *\nخطأ', 'كم عدد آيات سورة الزخرف؟\nأ) 89 *\nب) 99\nج) 75'].join('\n\n') });
   for (const q of (await chief('GET', `/api/tests/${tP.id}`)).questions) await chief('POST', `/api/questions/${q.id}/review`, { approve: true });
   await adm('PUT', `/api/tests/${tP.id}`, { ...tP, status: 'open' });
+  // مذكرة نموذجية واحدة لعرض ما يراه المتسابق؛ المذكرات الفعلية ترفعها الإدارة عند جاهزيتها
+  const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>', null, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
+  const txt = 'BT /F1 22 Tf 72 760 Td (Iqra competition - sample note) Tj 0 -34 Td /F1 14 Tf (Demo file only. Real curriculum notes are uploaded by the administration.) Tj ET';
+  objs[3] = `<< /Length ${txt.length} >>\nstream\n${txt}\nendstream`;
+  let pdf = '%PDF-1.4\n'; const offs = [];
+  objs.forEach((o, i) => { offs.push(pdf.length); pdf += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offs.map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  await adm('POST', '/api/admin/materials', { title: 'مذكرة نموذجية لفرع الحفظ (للتجربة فقط)', note: 'ملف تجريبي يوضح طريقة ظهور المذكرات؛ المذكرات الفعلية تُرفع عند جاهزيتها.', branch: 'hifz', publish: true, file: { name: 'مذكرة-نموذجية.pdf', data: Buffer.from(pdf, 'latin1').toString('base64') } });
   srv.close();
   db.prepare('DELETE FROM sessions').run();
   db.pragma('wal_checkpoint(TRUNCATE)');

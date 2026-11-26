@@ -22,7 +22,7 @@ const out = esbuild.buildSync({
   alias: { 'better-sqlite3': shim('better-sqlite3.js'), express: shim('express.js'), crypto: shim('crypto.js'), fs: shim('fs.js'), path: require.resolve('path-browserify') },
   loader: { '.wasm': 'binary', '.db': 'binary' },
   define: { __dirname: '"/app"', 'require.main': 'undefined' },
-  banner: { js: 'globalThis.process=globalThis.process||{env:{},argv:[],platform:"browser"};if(!Number.prototype.unref)Object.defineProperty(Number.prototype,"unref",{value:function(){return this}});' },
+  banner: { js: 'globalThis.process=globalThis.process||{env:{BLOBS_IN_DB:"1",MATERIAL_MAX_MB:"1"},argv:[],platform:"browser"};if(!Number.prototype.unref)Object.defineProperty(Number.prototype,"unref",{value:function(){return this}});' },
   external: ['nodemailer'], // البريد لا يعمل داخل المتصفح
   logLevel: 'warning',
 });

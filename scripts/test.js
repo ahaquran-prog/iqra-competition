@@ -20,7 +20,7 @@ function client(base) {
     const res = await fetch(base + url, { method, headers: { 'X-Iqra': '1', 'Content-Type': 'application/json', Cookie: cookie }, body: body ? JSON.stringify(body) : undefined });
     const sc = res.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0];
     const text = await res.text(); let data; try { data = JSON.parse(text); } catch { data = text; }
-    return { status: res.status, data };
+    return { status: res.status, data, headers: res.headers };
   };
 }
 
@@ -525,6 +525,80 @@ function client(base) {
     r = await ppl.c1.c('POST', '/api/notifications/read', {});
     ok('تعليم الإشعارات مقروءة', (await notes(ppl.c1.c)).unread === 0);
     hook.close(); CFG.sms.url = '';
+
+    console.log('مذكرات المقررات');
+    const pdf = (t) => ({ name: 'مذكرة ' + t + '.pdf', data: Buffer.from('%PDF-1.4\n' + t + '\n%%EOF').toString('base64') });
+    const myM = async (c) => (await c('GET', '/api/my/materials')).data.rows;
+    r = await admin('POST', '/api/admin/materials', { title: 'مذكرة الحفظ', branch: 'hifz', publish: true, file: pdf('hifz') });
+    ok('رفع مذكرة لفرع ونشرها يُشعر المسجلين فيه', r.status === 200 && r.data.notified >= 3 && r.data.material.published, r.data);
+    const M1 = r.data.material;
+    ok('مذكرات المتسابق: مذكرة فرعه تظهر في حسابه', (await myM(ppl.c1.c)).some((m) => m.id === M1.id));
+    ok('مذكرة الحفظ لا تظهر لمتسابق التلاوة وحدها', !(await myM(c5)).some((m) => m.id === M1.id));
+    r = await ppl.c1.c('GET', `/api/materials/${M1.id}/file`);
+    ok('تنزيل المذكرة: الملف نفسه بنوعه واسمه', r.status === 200 && String(r.data).startsWith('%PDF-1.4\nhifz') && r.headers.get('content-type') === 'application/pdf' && /filename\*=UTF-8''/.test(r.headers.get('content-disposition')));
+    r = await c5('GET', `/api/materials/${M1.id}/file`);
+    ok('لا يُنزّل المذكرة من ليست له', r.status === 404);
+    r = await admin('GET', '/api/admin/materials');
+    ok('الإدارة ترى عدد من وصلتهم المذكرة ومن نزّلها', r.data.materials.find((m) => m.id === M1.id).downloads === 1 && r.data.materials.find((m) => m.id === M1.id).audience >= 3);
+    ok('إشعار المذكرة في حساب المتسابق', (await notes(ppl.c1.c)).rows.some((x) => x.event === 'material' && x.title.includes('مذكرة الحفظ')));
+    r = await admin('POST', '/api/admin/materials', { title: 'مسودة', branch: 'hifz', file: pdf('draft') });
+    const M2 = r.data.material;
+    ok('المسودة لا تُشعر أحدًا ولا يراها المتسابق', r.data.notified === 0 && !(await myM(ppl.c1.c)).some((m) => m.id === M2.id) && (await ppl.c1.c('GET', `/api/materials/${M2.id}/file`)).status === 404);
+    ok('المسودة تعرض عدد من ستصلهم عند النشر', (await admin('GET', '/api/admin/materials')).data.materials.find((m) => m.id === M2.id).wouldReach >= 3);
+    r = await admin('PUT', `/api/admin/materials/${M2.id}`, { ...M2, publish: true });
+    ok('نشر المسودة لاحقًا يُشعر المعنيين', r.data.notified >= 3 && (await myM(ppl.c1.c)).some((m) => m.id === M2.id));
+    r = await admin('PUT', `/api/admin/materials/${M2.id}`, { ...M2, publish: true });
+    ok('حفظها مرة أخرى لا يكرر الإشعار', r.data.notified === 0);
+    r = await admin('POST', '/api/admin/materials', { title: 'خطأ', branch: 'hifz', file: { name: 'x.pdf', data: Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2]).toString('base64') } });
+    ok('رفض ملف لا يطابق محتواه امتداده', r.status === 400 && /لا يطابق/.test(r.data.error));
+    r = await admin('POST', '/api/admin/materials', { title: 'خطأ', branch: 'hifz', file: { name: 'run.exe', data: 'TVqQ' } });
+    ok('رفض نوع ملف غير مسموح', r.status === 400 && /غير مسموح/.test(r.data.error));
+    const mx = CFG.materialMaxMB; CFG.materialMaxMB = 0.00001;
+    r = await admin('POST', '/api/admin/materials', { title: 'كبير', branch: 'hifz', file: pdf('x'.repeat(200)) });
+    CFG.materialMaxMB = mx;
+    ok('رفض ملف أكبر من الحد', r.status === 413);
+    r = await admin('POST', '/api/admin/materials', { title: 'بلا ملف', branch: 'hifz' });
+    ok('لا مذكرة دون ملف', r.status === 400);
+    // التخصيص بالمقرر والمرحلة
+    const e1 = ppl.c1.reg.entries.find((e) => e.branch === 'tilawa');
+    const cur1 = db.prepare('SELECT curriculum_id FROM entries WHERE id=?').get(e1.id).curriculum_id;
+    r = await admin('POST', '/api/admin/materials', { title: 'مذكرة مقرر الترتيل لليافعين', branch: 'tilawa', curriculumId: cur1, publish: true, file: pdf('tartil') });
+    const M3 = r.data.material;
+    ok('مذكرة مقرر محدد تصل لأصحابه فقط', (await myM(ppl.c1.c)).some((m) => m.id === M3.id) && !(await myM(c5)).some((m) => m.id === M3.id));
+    r = await admin('POST', '/api/admin/materials', { title: 'خطأ', branch: 'hifz', curriculumId: cur1, file: pdf('x') });
+    ok('رفض مقرر من فرع آخر', r.status === 400);
+    r = await admin('POST', '/api/admin/materials', { title: 'مقطع النهائي', branch: 'hifz', stage: 'final', publish: true, file: pdf('final') });
+    const M4 = r.data.material;
+    ok('مذكرة النهائي للمتأهلين إليه فقط', (await myM(ppl.c1.c)).some((m) => m.id === M4.id) && !(await myM(ppl.c4.c)).some((m) => m.id === M4.id) && r.data.notified < 3, r.data.notified);
+    // الأقسام والصلاحيات
+    r = await execF('POST', '/api/admin/materials', { title: 'مشتركة', branch: 'hifz', section: '', file: pdf('f') });
+    ok('تنفيذية النساء ترفع لقسمها فقط', r.status === 200 && r.data.material.section === 'F');
+    const M5 = r.data.material;
+    ok('مذكرة قسم النساء لا تظهر للرجال', !(await myM(ppl.c1.c)).some((m) => m.id === M5.id));
+    r = await execM('PUT', `/api/admin/materials/${M5.id}`, { ...M5, title: 'x' });
+    ok('تنفيذية الرجال لا تعدّل مذكرة قسم النساء', r.status === 404);
+    r = await execM('PUT', `/api/admin/materials/${M1.id}`, { ...M1, title: 'x' });
+    ok('المذكرة المشتركة للقسمين تعدّلها الإدارة العليا فقط', r.status === 403);
+    r = await execM('GET', '/api/admin/materials');
+    ok('التنفيذية ترى مذكرات قسمها والمشتركة دون مذكرات القسم الآخر', r.data.materials.some((m) => m.id === M1.id) && !r.data.materials.some((m) => m.id === M5.id));
+    r = await judgeM('GET', '/api/admin/materials');
+    ok('المحكم لا يدخل إدارة المذكرات', r.status === 403);
+    r = await ppl.c1.c('POST', '/api/admin/materials', { title: 'x', branch: 'hifz', file: pdf('x') });
+    ok('المتسابق لا يرفع مذكرة', r.status === 403);
+    // التحديث والحذف
+    r = await admin('PUT', `/api/admin/materials/${M1.id}/file`, { file: pdf('hifz-v2') });
+    ok('استبدال الملف يرفع النسخة ويُشعر بالتحديث', r.status === 200 && r.data.material.version === 2 && r.data.notified >= 3);
+    let mm = (await myM(ppl.c1.c)).find((m) => m.id === M1.id);
+    ok('المتسابق يرى أن المذكرة حُدّثت بعد تنزيله لها', mm.updatedSince && mm.version === 2);
+    r = await ppl.c1.c('GET', `/api/materials/${M1.id}/file`);
+    ok('التنزيل بعد التحديث يعطي النسخة الجديدة', String(r.data).includes('hifz-v2'));
+    ok('رفع الملف نفسه مرة أخرى مرفوض', (await admin('PUT', `/api/admin/materials/${M1.id}/file`, { file: pdf('hifz-v2') })).status === 409);
+    r = await admin('DELETE', `/api/admin/materials/${M2.id}`);
+    ok('حذف المذكرة يخفيها عن المتسابق', r.status === 200 && !(await myM(ppl.c1.c)).some((m) => m.id === M2.id) && (await ppl.c1.c('GET', `/api/materials/${M2.id}/file`)).status === 404);
+    ok('رفع المذكرات وتعديلها وحذفها في سجل التدقيق', db.prepare("SELECT COUNT(*) n FROM audit WHERE entity='material'").get().n >= 7);
+    ok('الملف محفوظ في مجلد البيانات ببصمته', fs.readdirSync(path.join(tmp, 'files')).length >= 5);
+    r = await ppl.c1.c('POST', '/api/my/withdraw', {});
+    ok('المنسحب لا يرى المذكرات', r.status === 200 && (await myM(ppl.c1.c)).length === 0 && (await ppl.c1.c('GET', `/api/materials/${M1.id}/file`)).status === 404);
 
     console.log('إعداد الدورة');
     r = await admin('GET', '/api/admin/competition');

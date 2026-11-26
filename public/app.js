@@ -46,8 +46,8 @@ const NAV = {
   judge: [['grade', 'الرصد'], ['queues', 'طابور لجنتي'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   coordinator: [['queues', 'النداء'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   chief: [['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['tests', 'اختبارات التفسير'], ['committees', 'اللجان'], ['regs', 'المسجلون (اطلاع)'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  exec: [['dash', 'لوحة القسم'], ['schedule', 'المواعيد'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'المسجلون'], ['tests', 'اختبارات التفسير'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  top: [['dash', 'لوحة المتابعة'], ['regs', 'المسجلون'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['tests', 'اختبارات التفسير'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['schedule', 'المواعيد'], ['notices', 'الإشعارات'], ['setup', 'إعداد الدورة'], ['users', 'حسابات الكادر'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  exec: [['dash', 'لوحة القسم'], ['schedule', 'المواعيد'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'المسجلون'], ['tests', 'اختبارات التفسير'], ['materials', 'المذكرات'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  top: [['dash', 'لوحة المتابعة'], ['regs', 'المسجلون'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['tests', 'اختبارات التفسير'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['schedule', 'المواعيد'], ['materials', 'المذكرات'], ['notices', 'الإشعارات'], ['setup', 'إعداد الدورة'], ['users', 'حسابات الكادر'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   screen: [['screen', 'شاشة الانتظار']],
 };
 const navFor = () => NAV[me ? me.role : 'public'];
@@ -189,6 +189,7 @@ async function vMy() {
   S.myQ = S.my.registration ? (await api('/my/queue')).tickets : [];
   S.myR = S.my.registration ? (await api('/my/results')).results : [];
   S.mySch = S.my.registration ? (await api('/my/schedule')).rows : [];
+  S.myM = S.my.registration ? (await api('/my/materials')).rows : [];
   if (S.myQ.some((t) => ['waiting', 'called', 'testing', 'needs_committee'].includes(t.status))) startPoll(10000, repaint); else stopPoll();
   const m = S.my, c = m.competition;
   if (!c) return `<div class="card empty"><h2>لا توجد دورة حالية</h2></div>`;
@@ -205,11 +206,35 @@ async function vMy() {
   <div class="grid2"><div class="card"><div class="status"><span class="big">${esc(r.statusName)}</span></div>
     <p class="note">سُجّلت ${esc(fmt(r.createdAt))}${r.updatedAt !== r.createdAt ? ' · آخر تحديث ' + esc(fmt(r.updatedAt)) : ''}</p>
     <h3>مشاركاتي (${active.length})</h3>
-    ${active.map((e) => { const t = (S.myQ || []).find((x) => x.entryId === e.id); return `<div class="entry"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${myTag(t, e.id)}<span class="cur">المقرر: ${esc(e.curriculum)}</span>${t && t.status === 'called' ? `<p class="callnow">تم نداؤك: توجّه الآن إلى ${esc(t.committee)}${t.hall ? ' — ' + esc(t.hall) : ''}</p>` : ''}${(S.myR || []).filter((x) => x.entryId === e.id).map((x) => `<p class="myres">${esc(x.stageName)}: <b>${n2(x.total)}</b> من ${n2(x.max)} · الترتيب ${x.rank} من ${x.count}${x.nextStageName && x.qualified != null ? ` · ${x.qualified ? `<span class="tag ok">متأهل إلى ${esc(x.nextStageName)}</span>` : `<span class="tag">لم يتأهل إلى ${esc(x.nextStageName)}</span>`}` : ''}</p>`).join('')}</div>`; }).join('') || '<p class="note">لا توجد مشاركات قائمة.</p>'}
+    ${active.map((e) => { const t = (S.myQ || []).find((x) => x.entryId === e.id); return `<div class="entry"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${myTag(t, e.id)}<span class="cur">المقرر: ${esc(e.curriculum)}</span>${t && t.status === 'called' ? `<p class="callnow">تم نداؤك: توجّه الآن إلى ${esc(t.committee)}${t.hall ? ' — ' + esc(t.hall) : ''}</p>` : ''}${myMaterials(e.id)}${(S.myR || []).filter((x) => x.entryId === e.id).map((x) => `<p class="myres">${esc(x.stageName)}: <b>${n2(x.total)}</b> من ${n2(x.max)} · الترتيب ${x.rank} من ${x.count}${x.nextStageName && x.qualified != null ? ` · ${x.qualified ? `<span class="tag ok">متأهل إلى ${esc(x.nextStageName)}</span>` : `<span class="tag">لم يتأهل إلى ${esc(x.nextStageName)}</span>`}` : ''}</p>`).join('')}</div>`; }).join('') || '<p class="note">لا توجد مشاركات قائمة.</p>'}
     ${old.length ? `<details><summary class="note">مشاركات ملغاة (${old.length})</summary>${old.map((e) => `<div class="entry off"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b><span class="tag">ملغاة</span><span class="cur">${esc(e.curriculum)}</span></div>`).join('')}</details>` : ''}</div>
   <div class="card"><h3>ملفي</h3><dl class="kv"><dt>الاسم</dt><dd>${esc(m.person.fullName)}</dd><dt>رقم الهوية</dt><dd class="ltr">${esc(m.person.nationalId)}</dd><dt>سنة الميلاد</dt><dd>${esc(r.birthYear)}</dd><dt>الفئة</dt><dd>${esc(r.categoryName)}</dd><dt>القسم</dt><dd>${esc(r.sectionName)}</dd><dt>الهاتف</dt><dd class="ltr">${esc(m.person.phone)}</dd><dt>هاتف آخر</dt><dd class="ltr">${esc(m.person.phone2 || '—')}</dd></dl>
     <div class="acts"><button class="btn sm" data-act="phones">تحديث أرقام التواصل</button></div>
     <p class="note">لتصحيح الاسم أو رقم الهوية أو سنة الميلاد بعد المراجعة، تواصل مع الإدارة التنفيذية لقسمك.</p></div></div>`;
+}
+
+// مذكرات المقرر تحت كل مشاركة
+const kb = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' م.ب' : Math.max(1, Math.round(n / 1024)) + ' ك.ب');
+function myMaterials(entryId) {
+  const ms = (S.myM || []).filter((m) => m.entryId === entryId);
+  if (!ms.length) return '';
+  return `<div class="mats"><span class="subhead">مذكرات المقرر</span><ul>${ms.map((m) => `<li><div><b>${esc(m.title)}</b>${m.stage ? ` <span class="tag plum">${esc(m.stageName)}</span>` : ''}${m.updatedSince ? ' <span class="tag warn">نسخة محدّثة</span>' : !m.downloaded ? ' <span class="tag info">جديدة</span>' : ''}${m.note ? `<small class="note">${esc(m.note)}</small>` : ''}</div>
+    <button class="btn sm pri" data-act="mdl" data-id="${m.id}" data-n="${esc(m.fileName)}">تنزيل ${esc(m.fileType)} · <bdi>${kb(m.size)}</bdi></button></li>`).join('')}</ul></div>`;
+}
+async function download(id, name) {
+  let res;
+  try { res = await fetch('/api/materials/' + id + '/file', { headers: { 'X-Iqra': '1' }, credentials: 'same-origin' }); } catch (e) { throw new Error('تعذّر الاتصال بالخادم. تحقق من الشبكة.'); }
+  if (!res.ok) { let d = {}; try { d = await res.json(); } catch (e) {} throw new Error(d.error || 'تعذّر التنزيل'); }
+  const url = URL.createObjectURL(await res.blob()), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+const readB64 = (file) => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(new Error('تعذّرت قراءة الملف')); r.readAsDataURL(file); });
+async function pickedFile(input) {
+  const f = input && input.files && input.files[0];
+  if (!f) throw new Error('اختر الملف');
+  if (f.size > S.mat.maxMB * 1048576) throw new Error(`حجم الملف ${kb(f.size)}، والحد المسموح ${S.mat.maxMB} ميغابايت`);
+  return { name: f.name, data: await readB64(f) };
 }
 
 function myTag(t, entryId) {
@@ -808,7 +833,43 @@ async function vNotices() {
       <td><span class="tag ${x.status === 'sent' ? 'ok' : x.status === 'failed' ? 'bad' : 'warn'}">${esc(x.statusName)}</span>${x.error ? `<br><small class="note">${esc(x.error)}</small>` : ''}</td><td class="n">${x.attempts}</td><td>${x.status === 'failed' || x.status === 'skipped' ? `<button class="btn sm" data-act="resend" data-id="${x.id}">إعادة الإرسال</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>`;
 }
 
-const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults, tests: vTests, inbox: vInbox, schedule: vSchedule, notices: vNotices };
+// ---------- مذكرات المقررات: الإدارة ----------
+const MSTG = [['', 'كل المراحل'], ['semi', 'المتأهلون إلى قبل النهائي'], ['final', 'المتأهلون إلى النهائي']];
+const currLabel = (x) => `${x.trackName ? x.trackName + ' · ' : ''}${x.categoryId ? catName(x.categoryId) + ' · ' : ''}${x.content}`;
+function matFields(m, pre) {
+  const brs = pub.branches.map((b) => [b.code, b.name]);
+  const br = m ? m.branch : brs[0][0];
+  const curr = pub.curricula.filter((x) => x.branch === br).map((x) => [x.id, currLabel(x)]);
+  return `<div class="field"><label for="${pre}-t">عنوان المذكرة <span class="req">*</span></label><input id="${pre}-t" required maxlength="150" value="${esc(m ? m.title : '')}" placeholder="مثل: مذكرة تفسير جزء عمّ"></div>
+    <div class="row2"><div class="field"><label for="${pre}-br">الفرع</label><select id="${pre}-br" data-mbr="${pre}">${opts(brs, br)}</select></div>
+    <div class="field"><label for="${pre}-cu">المقرر</label><select id="${pre}-cu">${opts(curr, m ? m.curriculumId : '', 'كل مقررات الفرع')}</select></div></div>
+    <div class="row3"><div class="field"><label for="${pre}-ca">الفئة</label><select id="${pre}-ca">${opts(pub.categories.map((c) => [c.id, c.name]), m ? m.categoryId : '', 'كل الفئات')}</select></div>
+    ${me.role === 'top' ? `<div class="field"><label for="${pre}-se">القسم</label><select id="${pre}-se">${opts(Object.entries(meta.sections), m ? m.section : '', 'القسمان')}</select></div>` : ''}
+    <div class="field"><label for="${pre}-st">لمن</label><select id="${pre}-st">${opts(MSTG, m ? m.stage : '')}</select></div></div>
+    <div class="field"><label for="${pre}-no">وصف قصير للمتسابقين</label><input id="${pre}-no" maxlength="500" value="${esc(m ? m.note : '')}"></div>`;
+}
+const matBody = (pre) => ({ title: val(pre + '-t'), branch: val(pre + '-br'), curriculumId: val(pre + '-cu') || null, categoryId: val(pre + '-ca') || null, section: val(pre + '-se'), stage: val(pre + '-st'), note: val(pre + '-no') });
+async function vMaterials() {
+  const d = S.mat = await api('/admin/materials');
+  const groups = pub.branches.map((b) => [b, d.materials.filter((m) => m.branch === b.code)]).filter(([, ms]) => ms.length);
+  const accept = d.types.map((x) => '.' + x).join(',');
+  return `<div class="head"><div><h1>مذكرات المقررات</h1><p>ارفع المذكرة متى جهزت، فتظهر لكل متسابق في «مشاركتي» تحت مشاركته، ويصله إشعار. المسودة لا يراها المتسابقون حتى تنشرها.</p></div></div>
+  <div class="grid2"><div class="card"><h2>المذكرات (${d.materials.length})</h2>${groups.length ? groups.map(([b, ms]) => `<h3>${esc(b.name)}</h3><ul class="matlist">${ms.map((m) => `<li>
+      <div><b>${esc(m.title)}</b> <span class="tag ${m.published ? 'ok' : 'warn'}">${m.published ? 'منشورة' : 'مسودة'}</span>${m.version > 1 ? ` <span class="tag">النسخة ${m.version}</span>` : ''}
+      <small class="note">${esc(m.target)}${m.section ? '' : ' · القسمان'}</small>
+      <small class="note"><bdi>${esc(m.fileName)}</bdi> · <bdi>${kb(m.size)}</bdi> · ${m.published ? `وصلت إلى ${m.audience} · نزّلها ${m.downloads}` : `ستصل عند النشر إلى ${m.wouldReach}`}</small></div>
+      <div class="acts"><button class="btn sm" data-act="mdl" data-id="${m.id}" data-n="${esc(m.fileName)}">تنزيل</button>${m.canEdit && d.canManage ? `
+        <button class="btn sm ${m.published ? '' : 'pri'}" data-act="m-pub" data-id="${m.id}" data-on="${m.published ? 0 : 1}">${m.published ? 'إيقاف النشر' : 'نشر وإشعار'}</button>
+        <button class="btn sm" data-act="m-edit" data-id="${m.id}">تعديل</button><button class="btn sm" data-act="m-file" data-id="${m.id}">استبدال الملف</button>
+        <button class="btn sm badb" data-act="m-del" data-id="${m.id}">حذف</button>` : ''}</div></li>`).join('')}</ul>`).join('') : '<p class="note">لم تُرفع مذكرات بعد. يمكن رفعها في أي وقت خلال الدورة.</p>'}</div>
+  ${d.canManage ? `<div class="card"><h2>رفع مذكرة</h2><form data-form="material"><p class="err" hidden></p>${matFields(null, 'mt')}
+    <div class="field"><label for="mt-f">الملف <span class="req">*</span></label><input id="mt-f" type="file" accept="${accept}" required><small>${d.types.map((x) => x.toUpperCase()).join('، ')} · حتى ${d.maxMB} ميغابايت${window.__iqraDemo ? ' (في النسخة التجريبية)' : ''}</small></div>
+    <label class="check"><input type="checkbox" id="mt-p" checked> نشرها الآن وإشعار المعنيين</label>
+    <div class="acts"><button class="btn pri" type="submit">رفع المذكرة</button></div></form>
+    <p class="note">المذكرة لكل الفرع ما لم تخصصها بمقرر أو فئة. «المتأهلون إلى…» تجعلها لمن تأهل إلى تلك المرحلة فقط، مثل مقاطع النهائي.${me.role === 'exec' ? ' تُرفع لقسمك؛ المذكرة المشتركة للقسمين ترفعها الإدارة العليا.' : ''}</p></div>` : ''}</div>`;
+}
+
+const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults, tests: vTests, inbox: vInbox, schedule: vSchedule, notices: vNotices, materials: vMaterials };
 
 // ---------- الأحداث ----------
 const val = (id) => (document.getElementById(id) || {}).value || '';
@@ -863,6 +924,11 @@ document.addEventListener('click', async (e) => {
         <div class="field"><label for="se-at">التاريخ والوقت</label><input id="se-at" type="datetime-local" value="${toLocal(x.startsAt)}" required></div><div class="field"><label for="se-loc">الموقع</label><input id="se-loc" value="${esc(x.location)}" required></div><div class="field"><label for="se-note">ملاحظة</label><input id="se-note" value="${esc(x.note)}"></div>
         <div class="acts"><button class="btn pri" type="submit">حفظ وإشعار المعنيين</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`); }
     else if (a === 'rem-run') { const r = await api('/admin/reminders', { method: 'POST' }); toast(r.sent ? `أُرسل ${r.sent} تذكيرًا` : 'لا توجد تذكيرات مستحقة الآن'); render(); }
+    else if (a === 'mdl') { b.disabled = true; try { await download(id, b.dataset.n); if (view === 'my') setTimeout(repaint, 400); } finally { b.disabled = false; } }
+    else if (a === 'm-pub') { const m = S.mat.materials.find((x) => x.id === +id); const r = await api('/admin/materials/' + id, { method: 'PUT', body: { ...m, publish: b.dataset.on === '1' } }); toast(b.dataset.on === '1' ? `نُشرت المذكرة وأُشعر ${r.notified} متسابقًا` : 'أُوقف نشر المذكرة'); render(); }
+    else if (a === 'm-edit') { const m = S.mat.materials.find((x) => x.id === +id); modal('تعديل ' + m.title, `<form data-form="matedit" data-id="${m.id}"><p class="err" hidden></p>${matFields(m, 'me')}<p class="note">${m.published ? 'المذكرة منشورة: إن وسّعت جمهورها يُشعر من أُضيفوا فقط.' : 'المذكرة مسودة.'}</p><div class="acts"><button class="btn pri" type="submit">حفظ</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`); }
+    else if (a === 'm-file') { const m = S.mat.materials.find((x) => x.id === +id); modal('استبدال ملف ' + m.title, `<form data-form="matfile" data-id="${m.id}"><p class="err" hidden></p><p>الملف الحالي: ${esc(m.fileName)} (النسخة ${m.version}).</p><div class="field"><label for="mf-f">الملف الجديد</label><input id="mf-f" type="file" accept="${S.mat.types.map((x) => '.' + x).join(',')}" required></div><p class="note">${m.published ? 'يُشعر من وصلتهم المذكرة بأن نسخة محدّثة متاحة.' : ''}</p><div class="acts"><button class="btn pri" type="submit">رفع النسخة الجديدة</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`); }
+    else if (a === 'm-del') { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'تأكيد الحذف'; return; } await api('/admin/materials/' + id, { method: 'DELETE' }); toast('حُذفت المذكرة'); render(); }
     else if (a === 'resend') { await api(`/admin/deliveries/${id}/resend`, { method: 'POST' }); toast('أُعيد إلى طابور الإرسال'); render(); }
     // اختبار التفسير
     else if (a === 'ex-start') modal('بدء الاختبار', `<p>يبدأ احتساب الوقت (${esc(b.dataset.n)} دقيقة) فور البدء، ولا يتوقف إذا أغلقت الصفحة. تُحفظ كل إجابة فور اختيارها، وتُرسل إجاباتك المحفوظة آليًا عند انتهاء الوقت.</p><div class="acts"><button class="btn pri" data-act="ex-go" data-id="${id}">ابدأ الآن</button><button class="btn" data-act="close">ليس الآن</button></div>`);
@@ -948,6 +1014,7 @@ function specToggle() { const r = $('#u-r'); if (!r) return; $('#u-spec-f').hidd
 document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'u-r') specToggle();
+  if (t.dataset.mbr) { const cu = document.getElementById(t.dataset.mbr + '-cu'); if (cu) cu.innerHTML = opts(pub.curricula.filter((x) => x.branch === t.value).map((x) => [x.id, currLabel(x)]), '', 'كل مقررات الفرع'); }
   if (t.id === 'u-role') { S.usersRole = t.value; render(); }
   if (t.dataset.ex && S.exam) {
     const qid = +t.dataset.ex, sv = $('#sv-' + qid); if (sv) sv.textContent = 'جارٍ الحفظ…';
@@ -1005,6 +1072,9 @@ document.addEventListener('submit', async (e) => {
       const r = await api('/sessions', { method: 'POST', body }); toast(`حُفظ الموعد، وأُشعر ${r.notified} متسابقًا`); render();
     }
     else if (k === 'session-edit') { const r = await api('/sessions/' + f.dataset.id, { method: 'PUT', body: { startsAt: new Date(val('se-at')).getTime(), location: val('se-loc'), note: val('se-note') } }); closeModal(); toast(r.notified ? `حُفظ التعديل، وأُشعر ${r.notified} متسابقًا` : 'لا تغيير'); render(); }
+    else if (k === 'material') { const r = await api('/admin/materials', { method: 'POST', body: { ...matBody('mt'), publish: $('#mt-p').checked, file: await pickedFile($('#mt-f')) } }); toast(r.material.published ? `رُفعت المذكرة وأُشعر ${r.notified} متسابقًا` : 'رُفعت المذكرة مسودة'); render(); }
+    else if (k === 'matedit') { const r = await api('/admin/materials/' + f.dataset.id, { method: 'PUT', body: matBody('me') }); closeModal(); toast(r.notified ? `حُفظت، وأُشعر ${r.notified} متسابقًا أُضيفوا` : 'حُفظت المذكرة'); render(); }
+    else if (k === 'matfile') { const r = await api(`/admin/materials/${f.dataset.id}/file`, { method: 'PUT', body: { file: await pickedFile($('#mf-f')) } }); closeModal(); toast(`رُفعت النسخة ${r.material.version}${r.notified ? ` وأُشعر ${r.notified} متسابقًا` : ''}`); render(); }
     else if (k === 'announce') { const r = await api('/admin/announce', { method: 'POST', body: { stage: val('an-st'), section: val('an-sec'), branch: val('an-br'), title: val('an-t'), body: val('an-b') } }); toast(`أُرسل الإعلان إلى ${r.sent} متسابقًا`); render(); }
     else if (k === 'testnew') { const r = await api('/tests', { method: 'POST', body: { curriculumId: val('tn-c'), title: val('tn-t'), questionCount: val('tn-n'), durationMin: val('tn-d') } }); closeModal(); S.testId = r.test.id; render(); }
     else if (k === 'test') {

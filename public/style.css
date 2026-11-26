@@ -313,3 +313,13 @@ tr.pend td{background:#fffaf0}
 .inbox li{padding:14px 0;border-bottom:1px solid var(--line)}.inbox li:last-child{border-bottom:0}
 .inbox li.new{background:linear-gradient(90deg,transparent,var(--soft));padding-inline:10px;border-radius:8px}
 .inbox p{margin:6px 0}
+
+/* مذكرات المقررات */
+.mats{grid-column:1/-1;margin:6px 0 0;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.mats .subhead{display:block;margin:0 0 4px}
+.mats ul,.matlist{list-style:none;margin:0;padding:0}
+.mats li,.matlist li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}
+.mats li:last-child,.matlist li:last-child{border-bottom:0}
+.mats li small,.matlist li small{display:block}
+.matlist li>div:first-child{min-width:0;flex:1 1 240px}
+.matlist .acts{margin:0}

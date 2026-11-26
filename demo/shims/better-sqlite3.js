@@ -41,7 +41,7 @@ class Database {
     };
   }
   backup() { return Promise.resolve(); }
-  save() { try { localStorage.setItem(KEY, b64e(this.db.export())); this.v = String(Date.now()) + Math.random().toString(36).slice(2, 6); localStorage.setItem(VER, this.v); this.db.exec('PRAGMA foreign_keys=ON'); } catch (e) {} }
+  save() { try { localStorage.setItem(KEY, b64e(this.db.export())); this.v = String(Date.now()) + Math.random().toString(36).slice(2, 6); localStorage.setItem(VER, this.v); this.db.exec('PRAGMA foreign_keys=ON'); globalThis.__iqraSaveFail = false; } catch (e) { globalThis.__iqraSaveFail = true; } }
 }
 Database.KEY = KEY;
 module.exports = Database;
