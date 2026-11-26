@@ -1,0 +1,10 @@
+/* لوحة النسخة التجريبية */
+.demo{position:fixed;inset-inline-start:16px;bottom:16px;z-index:40;max-width:min(360px,calc(100% - 32px))}
+.demo summary{list-style:none;cursor:pointer;background:var(--gold);color:#241a30;font-weight:700;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px -10px rgba(20,12,28,.5);min-height:44px;display:flex;align-items:center}
+.demo summary::-webkit-details-marker{display:none}
+.demo details[open] summary{border-radius:14px 14px 0 0}
+.demo-in{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:14px;display:grid;gap:8px;box-shadow:0 20px 40px -16px rgba(20,12,28,.45);max-height:70vh;overflow:auto}
+.demo-in p{margin:0;font-size:14px}
+.demo-in .btn{justify-content:space-between;white-space:normal;text-align:start}
+.demo-in .btn small{color:var(--mute);font-weight:500}
+@media print{.demo{display:none}}

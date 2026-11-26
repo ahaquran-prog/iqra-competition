@@ -47,7 +47,7 @@ const NAV = {
   coordinator: [['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   chief: [['regs', 'التسجيلات (اطلاع)'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   exec: [['dash', 'لوحة القسم'], ['regs', 'التسجيلات'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  top: [['dash', 'لوحة المتابعة'], ['regs', 'التسجيلات'], ['settings', 'إعداد الدورة'], ['users', 'الحسابات'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  top: [['dash', 'لوحة المتابعة'], ['regs', 'التسجيلات'], ['setup', 'إعداد الدورة'], ['users', 'الحسابات'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
 };
 const navFor = () => NAV[me ? me.role : 'public'];
 const homeOf = () => navFor()[0][0];
@@ -266,7 +266,7 @@ async function vRegs() {
   }
   const pages = Math.max(1, Math.ceil(d.total / d.pageSize));
   return `<div class="head"><div><h1>التسجيلات</h1><p>${me.role === 'top' ? 'القسمان' : esc(me.sectionName)} · مرتبة أبجديًا${chief ? ' · اطلاع دون بيانات الاتصال' : ''}</p></div>
-    ${canManage() ? `<div class="acts"><a class="btn" href="/api/registrations.csv?${esc(regParams({ page: '' }))}" download>تصدير إلى Excel (CSV)</a></div>` : ''}</div>
+    ${canManage() ? `<div class="acts"><button class="btn" data-act="csv" data-href="/api/registrations.csv?${esc(regParams({ page: '' }))}">تصدير إلى Excel (CSV)</button></div>` : ''}</div>
   <div class="card"><form class="filters" data-form="regf" role="search">
     <input type="search" id="f-q" value="${esc(f.q)}" placeholder="${chief ? 'بحث بالاسم' : 'بحث بالاسم أو الهوية أو الهاتف'}" aria-label="بحث">
     ${me.role === 'top' ? `<select id="f-section" aria-label="القسم">${opts(Object.entries(meta.sections), f.section, 'القسمان')}</select>` : ''}
@@ -395,7 +395,7 @@ async function vAudit() {
   <div class="pager"><span class="note">صفحة ${d.page} من ${pages} · ${d.total} حدثًا</span><div class="acts"><button class="btn sm" data-act="apage" data-p="${d.page - 1}" ${d.page > 1 ? '' : 'disabled'}>الأحدث</button><button class="btn sm" data-act="apage" data-p="${d.page + 1}" ${d.page < pages ? '' : 'disabled'}>الأقدم</button></div></div></div>`;
 }
 
-const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, settings: vSettings, users: vUsers, audit: vAudit };
+const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit };
 
 // ---------- الأحداث ----------
 const val = (id) => (document.getElementById(id) || {}).value || '';
@@ -426,6 +426,11 @@ document.addEventListener('click', async (e) => {
     else if (a === 'withdraw') modal('الانسحاب من المسابقة', `<p>يُسجَّل انسحابك من جميع مشاركاتك في هذه الدورة، ويبقى طلبك محفوظًا في السجل. لا يمكنك التراجع عنه من حسابك.</p><form data-form="withdraw"><p class="err" hidden></p><div class="field"><label for="wd-r">السبب (اختياري)</label><textarea id="wd-r"></textarea></div><div class="acts"><button class="btn badb" type="submit">تأكيد الانسحاب</button><button class="btn" type="button" data-act="close">تراجع</button></div></form>`);
     else if (a === 'phones') modal('تحديث أرقام التواصل', `<form data-form="phones"><p class="err" hidden></p><div class="field"><label for="ph-1">الهاتف الأساسي</label><input id="ph-1" class="ltr" type="tel" value="${esc(S.my.person.phone)}" required></div><div class="field"><label for="ph-2">هاتف آخر</label><input id="ph-2" class="ltr" type="tel" value="${esc(S.my.person.phone2)}"></div><div class="acts"><button class="btn pri" type="submit">حفظ</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`);
     // التسجيلات
+    else if (a === 'csv') {
+      if (!window.__iqraDemo) { location.href = b.dataset.href; return; }
+      const t = (await (await fetch(b.dataset.href, { headers: { 'X-Iqra': '1' } })).text()).replace(/^\ufeff/, '');
+      modal('تصدير التسجيلات', `<p class="note">في النسخة التجريبية لا يُنزَّل الملف. في النسخة المنشورة يُنزَّل ملف CSV يفتح في Excel مباشرة.</p><textarea class="ltr" rows="12" readonly>${esc(t)}</textarea><div class="acts"><button class="btn pri" data-act="copy" data-v="${esc(t)}">نسخ</button></div>`);
+    }
     else if (a === 'reg') await openReg(+id);
     else if (a === 'page') { S.regs.page = +b.dataset.p; render(); }
     else if (a === 'pending') { Object.assign(S.regs, { status: 'submitted', page: 1 }); go('regs'); }
@@ -537,6 +542,9 @@ document.addEventListener('submit', async (e) => {
   } catch (err) { showErr(box, err); }
   finally { busy = false; if (btn) btn.disabled = false; }
 });
+
+// إعادة قراءة الحساب بعد الدخول من خارج الواجهة (تستخدمه النسخة التجريبية)
+window.__iqraRefresh = async () => { closeModal(); S.wz = null; try { me = (await api('/me')).user; } catch { me = null; } pub = await api('/public'); if (location.hash.slice(1) === homeOf()) route(); else go(homeOf()); };
 
 // ---------- البدء ----------
 (async () => {
