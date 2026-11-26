@@ -225,7 +225,14 @@ async function download(id, name) {
   let res;
   try { res = await fetch('/api/materials/' + id + '/file', { headers: { 'X-Iqra': '1' }, credentials: 'same-origin' }); } catch (e) { throw new Error('تعذّر الاتصال بالخادم. تحقق من الشبكة.'); }
   if (!res.ok) { let d = {}; try { d = await res.json(); } catch (e) {} throw new Error(d.error || 'تعذّر التنزيل'); }
-  const url = URL.createObjectURL(await res.blob()), a = document.createElement('a');
+  const blob = await res.blob();
+  // داخل عارض Claude (النسخة التجريبية المنشورة) يمر التنزيل عبر نافذة تأكيد العارض
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (dl) {
+    try { await dl.save({ filename: name, data: blob }); return; }
+    catch (e) { if (e && e.code === 'declined') return; if (e && e.code === 'rejected_extension') throw new Error('هذا النوع من الملفات لا يُنزَّل داخل العارض التجريبي'); if (!e || !['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e.code)) throw new Error('تعذّر التنزيل'); }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
