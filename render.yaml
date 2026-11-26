@@ -1,0 +1,32 @@
+# إعداد النشر على Render (Blueprint). يُقرأ تلقائيًا عند اختيار New → Blueprint في لوحة Render.
+services:
+  - type: web
+    name: iqra-competition
+    runtime: docker
+    plan: starter            # خطة مدفوعة: لا تتوقف عند الخمول وتقبل قرصًا دائمًا
+    region: frankfurt
+    healthCheckPath: /api/health
+    autoDeploy: true         # كل تعديل يُرفع إلى GitHub يُنشر تلقائيًا
+    disk:
+      name: iqra-data
+      mountPath: /var/data   # قاعدة البيانات والنسخ الاحتياطية
+      sizeGB: 5
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: TRUST_PROXY
+        value: "1"
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: AUTO_BACKUP
+        value: "1"
+      - key: TIME_ZONE
+        value: Asia/Riyadh
+      - key: ALLOW_SIGNUP
+        value: "1"
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_NAME
+        value: الإدارة العليا
+      - key: ADMIN_PASSWORD   # يُطلب منك إدخالها عند الإنشاء؛ مؤقتة وتُغيَّر عند أول دخول
+        sync: false
