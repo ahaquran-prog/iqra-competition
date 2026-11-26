@@ -29,6 +29,8 @@ const staff = [
   ['judge.t1', 'الشيخ علي الستري', 'judge', 'M', 'محكم التجويد الأول'],
   ['judge.t2', 'الشيخ جعفر المحروس', 'judge', 'M', 'محكم التجويد الثاني'],
   ['judge.t3', 'الشيخ محمود العرادي', 'judge', 'M', 'محكم الصوت والنغم'],
+  ['judge.t4', 'الشيخ حسين الصفار', 'judge', 'M', 'محكم الصوت والنغم الثاني'],
+  ['judge.t5', 'الشيخ عيسى القصاب', 'judge', 'M', 'محكم الوقف والابتداء'],
   ['judge.m4', 'الشيخ حسن البلوشي', 'judge', 'M', 'محكم الصوت والنغم'],
   ['screen.m', 'شاشة قاعة الرجال', 'screen', 'M', ''],
   ['screen.f', 'شاشة قاعة النساء', 'screen', 'F', ''],
@@ -108,26 +110,56 @@ function client(base) {
       } catch (e) {}
     }
   }
-  // الرصد: ثلاثة متسابقين أنهوا الاختبار في «الحفظ: اليافعون» بتقييمات كاملة، والجاري بتقييم ناقص
   const hz = hifzY.id;
-  const queue = async () => (await mgr.M('GET', '/api/queues')).committees.find((c) => c.id === hz);
-  for (let k = 0; k < 3; k++) {
-    const q = await queue();
-    if (q.current) { if (q.current.status === 'called') await mgr.M('POST', `/api/tickets/${q.current.id}/action`, { action: 'start' }); await mgr.M('POST', `/api/tickets/${q.current.id}/action`, { action: 'finish' }); }
-    try { const t = (await mgr.M('POST', `/api/committees/${hz}/next`)).ticket; await mgr.M('POST', `/api/tickets/${t.id}/action`, { action: 'start' }); } catch (e) {}
-  }
+  // الرصد: تُختبر مجموعات «الحفظ: اليافعون» و«التدوير» كاملة، وتُرصد كل استماراتها
   const J = {};
-  for (const l of ['judge.m', 'judge.m2', 'judge.m3', 'judge.m4']) { J[l] = client(base); await J[l]('POST', '/api/login', { login: l, password: PASS }); }
-  const work = (await J['judge.m']('GET', '/api/judge/work')).committees[0].rows;
-  const V = [[2, 1, 0, 3, 7, 10], [1, 0, 1, 1, 10, 10], [4, 2, 1, 5, 4, 7]];
-  for (const [i, r] of work.entries()) {
-    const v = V[i % V.length], seg = (o) => ({ segments: [o, {}, {}] });
+  for (const l of ['judge.m', 'judge.m2', 'judge.m3', 'judge.m4', 'judge.t1', 'judge.t2', 'judge.t3', 'judge.t4', 'judge.t5']) { J[l] = client(base); await J[l]('POST', '/api/login', { login: l, password: PASS }); }
+  const act = (id, action) => mgr.M('POST', `/api/tickets/${id}/action`, { action });
+  async function runCommittee(cid) {
+    for (let guard = 0; guard < 40; guard++) {
+      const q = (await mgr.M('GET', '/api/queues')).committees.find((c) => c.id === cid);
+      if (q.current) { if (q.current.status === 'called') await act(q.current.id, 'start'); await act(q.current.id, 'finish'); continue; }
+      if (!q.waiting.length) break;
+      // من يُختبر في لجنة أخرى: يُنهى اختباره هناك أولًا
+      for (const k of (await mgr.M('GET', '/api/queues')).committees) if (k.current && k.id !== cid && q.waiting.some((w) => w.name === k.current.name)) { if (k.current.status === 'called') await act(k.current.id, 'start'); await act(k.current.id, 'finish'); }
+      const t = (await mgr.M('POST', `/api/committees/${cid}/next`)).ticket; await act(t.id, 'start');
+    }
+  }
+  await runCommittee(hz); await runCommittee(tadM.id);
+  const V = [[2, 1, 0, 3, 7, 10], [1, 0, 1, 1, 10, 10], [4, 2, 1, 5, 4, 7], [0, 1, 0, 2, 10, 7], [3, 0, 2, 1, 7, 7]];
+  const seg = (o) => ({ segments: [o, {}, {}] });
+  const hw = (await J['judge.m']('GET', '/api/judge/work')).committees.find((k) => k.id === hz).rows;
+  for (const [i, r] of hw.entries()) {
+    const v = V[i % V.length];
     await J['judge.m']('PUT', '/api/judge/form/' + r.ticketId, { data: { ...seg({ haraka_t: v[0], kalima_s: v[1], taraddud: v[3] }), vocab: v[4] }, submit: true });
-    if (r.status === 'testing') { await J['judge.m2']('PUT', '/api/judge/form/' + r.ticketId, { data: seg({ haraka_t: v[0] }) }); continue; }
-    await J['judge.m2']('PUT', '/api/judge/form/' + r.ticketId, { data: { ...seg({ haraka_t: v[0] + 1, ayat_t: v[2] }), vocab: v[5] }, submit: true });
+    // آخر متسابق: استمارة المحكم الثاني مسودة، لتجربة إكمالها ثم اعتماد الكشف
+    if (i === hw.length - 1) await J['judge.m2']('PUT', '/api/judge/form/' + r.ticketId, { data: seg({ haraka_t: v[0] }) });
+    else await J['judge.m2']('PUT', '/api/judge/form/' + r.ticketId, { data: { ...seg({ haraka_t: v[0] + 1, ayat_t: v[2] }), vocab: v[5] }, submit: true });
     await J['judge.m3']('PUT', '/api/judge/form/' + r.ticketId, { data: seg({ sifat_khalal: v[3], sifat_tark: v[2], naqis: 1 }), submit: true });
     await J['judge.m4']('PUT', '/api/judge/form/' + r.ticketId, { data: { jamal: 18, murunah: 8, masaha: 8.5, adaa: 25 - i, maqamat: 16, tawzi: 8, deductions: { nashaz: i % 2 } }, submit: true });
   }
+  const tw = (await J['judge.t1']('GET', '/api/judge/work')).committees.find((k) => k.id === tadM.id).rows;
+  for (const [i, r] of tw.entries()) {
+    await J['judge.t1']('PUT', '/api/judge/form/' + r.ticketId, { data: { rows: { 1: { jali_t: i % 3 }, 2: { arid_ikhlal: i + 1 } } }, submit: true });
+    await J['judge.t2']('PUT', '/api/judge/form/' + r.ticketId, { data: { rows: { 1: { majhula: i + 2 } } }, submit: true });
+    const tv = { jamal: 9, murunah: 8.5, masaha: 8, shidda: 9, adaa: 9 - (i % 2) * 0.5, itqan: 8, tadarruj: 8.5, tawzi: 9, qaflat: 8, taathir: 9, deductions: {} };
+    await J['judge.t3']('PUT', '/api/judge/form/' + r.ticketId, { data: tv, submit: true });
+  }
+  // التدوير: اعتماد كشوف التصفيات، وتأهل الأول من كل فئة، ومقاطع قبل النهائي
+  const chief = client(base); await chief('POST', '/api/login', { login: 'chief.m', password: PASS });
+  for (const g of (await chief('GET', '/api/results?branch=tilawa')).groups.filter((g) => g.name.includes('تدوير') && g.canApprove)) {
+    await chief('POST', '/api/results/approve', { stage: 'prelim', groupKey: g.key });
+    const pv = await chief('POST', '/api/qualify/preview', { stage: 'prelim', groupKey: g.key, mode: 'count', value: 1 });
+    await chief('POST', '/api/qualify/approve', { stage: 'prelim', groupKey: g.key, mode: 'count', value: 1, decisions: pv.tie ? pv.rows.filter((r) => r.tieAtCut).map((r, k) => ({ entryId: r.entryId, qualified: k === 0, reason: 'قرار اللجنة' })) : [] });
+  }
+  const sp = (await adm('GET', '/api/admin/stage-passages')).rows;
+  const SEMI = { 'ترتيل · اليافعون': [43, 8, 14], 'ترتيل · الشباب': [29, 7, 12], 'ترتيل · الكبار': [28, 6, 10], 'تدوير · اليافعون': [50, 16, 30], 'تدوير · الشباب': [33, 7, 12], 'تدوير · الكبار': [27, 14, 26] };
+  await adm('PUT', '/api/admin/stage-passages', { rows: sp.map((x) => { const p = SEMI[x.name]; return { id: x.id, semi: p ? { surah: p[0], ayahFrom: p[1], ayahTo: p[2] } : null }; }) });
+  const semiT = (await mgr.M('GET', '/api/committees?stage=semi')).committees.find((k) => k.name.includes('التدوير'));
+  for (const l of ['judge.t1', 'judge.t2', 'judge.t3', 'judge.t4', 'judge.t5']) await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid(l), kind: 'judge' });
+  await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid('coord.m'), kind: 'coordinator' });
+  const rs = await mgr.M('GET', '/api/reception?stage=semi');
+  for (const r of rs.rows) await mgr.M('POST', '/api/checkin', { registrationId: r.id, stage: 'semi', items: r.entries.map((e) => ({ entryId: e.id })) });
   srv.close();
   db.prepare('DELETE FROM sessions').run();
   db.pragma('wal_checkpoint(TRUNCATE)');

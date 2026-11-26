@@ -180,6 +180,7 @@ async function vSpace() {
 async function vMy() {
   S.my = await api('/my');
   S.myQ = S.my.registration ? (await api('/my/queue')).tickets : [];
+  S.myR = S.my.registration ? (await api('/my/results')).results : [];
   if (S.myQ.some((t) => ['waiting', 'called', 'testing', 'needs_committee'].includes(t.status))) startPoll(10000, repaint); else stopPoll();
   const m = S.my, c = m.competition;
   if (!c) return `<div class="card empty"><h2>لا توجد دورة حالية</h2></div>`;
@@ -198,7 +199,7 @@ async function vMy() {
   <div class="grid2"><div class="card"><div class="status"><span class="big">${esc(r.statusName)}</span>${stTag(r.status)}</div>
     <p class="note">قُدّم الطلب ${esc(fmt(r.createdAt))}${r.updatedAt !== r.createdAt ? ' · آخر تحديث ' + esc(fmt(r.updatedAt)) : ''}</p>
     <h3>مشاركاتي (${active.length})</h3>
-    ${active.map((e) => { const t = (S.myQ || []).find((x) => x.entryId === e.id); return `<div class="entry"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${myTag(t)}<span class="cur">المقرر: ${esc(e.curriculum)}</span>${t && t.status === 'called' ? `<p class="callnow">تم نداؤك: توجّه الآن إلى ${esc(t.committee)}${t.hall ? ' — ' + esc(t.hall) : ''}</p>` : ''}</div>`; }).join('') || '<p class="note">لا توجد مشاركات قائمة.</p>'}
+    ${active.map((e) => { const t = (S.myQ || []).find((x) => x.entryId === e.id); return `<div class="entry"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${myTag(t)}<span class="cur">المقرر: ${esc(e.curriculum)}</span>${t && t.status === 'called' ? `<p class="callnow">تم نداؤك: توجّه الآن إلى ${esc(t.committee)}${t.hall ? ' — ' + esc(t.hall) : ''}</p>` : ''}${(S.myR || []).filter((x) => x.entryId === e.id).map((x) => `<p class="myres">${esc(x.stageName)}: <b>${n2(x.total)}</b> من ${n2(x.max)} · الترتيب ${x.rank} من ${x.count}${x.nextStageName && x.qualified != null ? ` · ${x.qualified ? `<span class="tag ok">متأهل إلى ${esc(x.nextStageName)}</span>` : `<span class="tag">لم يتأهل إلى ${esc(x.nextStageName)}</span>`}` : ''}</p>`).join('')}</div>`; }).join('') || '<p class="note">لا توجد مشاركات قائمة.</p>'}
     ${old.length ? `<details><summary class="note">مشاركات ملغاة (${old.length})</summary>${old.map((e) => `<div class="entry off"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b><span class="tag">ملغاة</span><span class="cur">${esc(e.curriculum)}</span></div>`).join('')}</details>` : ''}</div>
   <div class="card"><h3>ملفي</h3><dl class="kv"><dt>الاسم</dt><dd>${esc(m.person.fullName)}</dd><dt>رقم الهوية</dt><dd class="ltr">${esc(m.person.nationalId)}</dd><dt>سنة الميلاد</dt><dd>${esc(r.birthYear)}</dd><dt>الفئة</dt><dd>${esc(r.categoryName)}</dd><dt>القسم</dt><dd>${esc(r.sectionName)}</dd><dt>الهاتف</dt><dd class="ltr">${esc(m.person.phone)}</dd><dt>هاتف آخر</dt><dd class="ltr">${esc(m.person.phone2 || '—')}</dd></dl>
     <div class="acts"><button class="btn sm" data-act="phones">تحديث أرقام التواصل</button></div>
@@ -353,6 +354,7 @@ async function vDash() {
 // ---------- إعداد الدورة (الإدارة العليا) ----------
 async function vSettings() {
   S.adm = await api('/admin/competition');
+  S.sp = (await api('/admin/stage-passages')).rows;
   const a = S.adm, c = a.competition, codes = a.branches;
   const catOpts = [['', 'لكل الأعمار'], ...a.categories.map((x) => [x.id, x.name])];
   return `<div class="head"><div><h1>إعداد الدورة</h1><p>${esc(c.name)} · الدورة ${esc(c.number)} · ${a.registrations} تسجيلًا</p></div></div>
@@ -369,6 +371,10 @@ async function vSettings() {
   <details class="blk"><summary>المقررات والمسارات</summary><form data-form="curr"><p class="err" hidden></p><div class="scroll"><table class="edit-table"><thead><tr><th>الفرع</th><th>رمز المسار</th><th>اسم المسار</th><th>الفئة</th><th>المقرر</th><th>المقطع: سورة (رقم)</th><th>من آية</th><th>إلى آية</th><th></th></tr></thead><tbody id="curr-rows">
     ${a.curricula.map((x) => currRow(x, codes, catOpts)).join('')}</tbody></table></div><p class="note">رمز المسار بالإنجليزية (مثل cat، j5، tartil، tadweer، main). في الحفظ يختار المتسابق مسارًا واحدًا، وفي التلاوة ترتيل أو تدوير. «المقطع» لمقررات التلاوة: رقم السورة ونطاق الآيات، ومنه تُعرض الآيات في مصفوفة التجويد للمحكم.</p>
     <div class="acts"><button class="btn" type="button" data-act="add-curr">إضافة مقرر</button><button class="btn pri" type="submit">حفظ المقررات</button></div></form></details>
+  <details class="blk"><summary>مقاطع التلاوة في قبل النهائي والنهائي</summary><p class="note">لكل مقرر تلاوة مقطع خاص بكل مرحلة لاحقة (رقم السورة ونطاق الآيات). تظهر آياته للمحكم في مصفوفة التجويد. اترك الحقول فارغة إن لم يُعلن المقطع بعد.</p>
+    <div class="scroll"><table class="edit-table"><thead><tr><th>المقرر</th><th>التصفيات</th><th>قبل النهائي: سورة</th><th>من</th><th>إلى</th><th>النهائي: سورة</th><th>من</th><th>إلى</th></tr></thead><tbody id="sp-rows">
+    ${S.sp.map((x) => `<tr data-id="${x.id}"><td>${esc(x.name)}</td><td class="note">${esc(x.prelim)}</td>${['semi', 'final'].map((st) => { const v = x[st] || {}, p = st[0]; return `<td><input class="yr" name="${p}s" inputmode="numeric" value="${esc(v.surah ?? '')}" aria-label="السورة"></td><td><input class="yr" name="${p}f" inputmode="numeric" value="${esc(v.ayahFrom ?? '')}" aria-label="من آية"></td><td><input class="yr" name="${p}t" inputmode="numeric" value="${esc(v.ayahTo ?? '')}" aria-label="إلى آية"></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+    <button class="btn pri" data-act="sp-save">حفظ المقاطع</button></details>
   <details class="blk"><summary>الفروع: التعريف والشروط</summary>${a.branches.map((b) => `<form data-form="branch" data-id="${b.id}" class="card"><p class="err" hidden></p><div class="row2"><div class="field"><label>اسم الفرع</label><input name="name" value="${esc(b.name)}"></div><div class="field"><label>المراحل</label><input name="stages" value="${esc(b.stages)}"></div></div>
     <div class="field"><label>التعريف المختصر</label><textarea name="intro">${esc(b.intro)}</textarea></div><div class="field"><label>الشروط والمتطلبات (تظهر في «المزيد»)</label><textarea name="conditions">${esc(b.conditions)}</textarea></div>
     <label class="check"><input type="checkbox" name="registrable" ${b.registrable ? 'checked' : ''}>متاح للتسجيل (بدون تحديد يظهر للتعريف فقط)</label><button class="btn pri" type="submit">حفظ الفرع</button></form>`).join('')}</details>
@@ -419,13 +425,18 @@ async function vAudit() {
   <div class="pager"><span class="note">صفحة ${d.page} من ${pages} · ${d.total} حدثًا</span><div class="acts"><button class="btn sm" data-act="apage" data-p="${d.page - 1}" ${d.page > 1 ? '' : 'disabled'}>الأحدث</button><button class="btn sm" data-act="apage" data-p="${d.page + 1}" ${d.page < pages ? '' : 'disabled'}>الأقدم</button></div></div></div>`;
 }
 
+// ---------- المرحلة ----------
+const STG = [['prelim', 'التصفيات الأولية'], ['semi', 'قبل النهائي'], ['final', 'النهائي']];
+S.stage = 'prelim';
+const stageBar = () => `<div class="stagebar" role="group" aria-label="المرحلة">${STG.map(([k, n]) => `<button class="btn sm ${S.stage === k ? 'pri' : ''}" data-act="stage" data-s="${k}" aria-pressed="${S.stage === k}">${n}</button>`).join('')}</div>`;
+
 // ---------- الاستقبال وتسجيل الحضور ----------
 const TK = { waiting: 'info', needs_committee: 'warn', called: 'warn', testing: 'plum', done: 'ok', no_show: 'bad', cancelled: '' };
 const tTag = (t) => `<span class="tag ${TK[t.status] || ''}">${t.seq ? '#' + t.seq + ' · ' : ''}${esc(t.statusName)}${t.committee ? ' · ' + esc(t.committee) : ''}</span>`;
 async function vReception() {
   const f = S.rec = S.rec || { q: '', section: '', category: '', state: '', page: 1 };
   const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
-  const d = S.recData = await api('/reception?' + qs);
+  const d = S.recData = await api('/reception?' + qs + '&stage=' + S.stage);
   const c = d.counts, pages = Math.max(1, Math.ceil(d.total / d.pageSize));
   const row = (r) => {
     const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
@@ -435,6 +446,7 @@ async function vReception() {
     <td>${el.length ? `<button class="btn ${quick ? 'pri' : ''} sm" data-act="${quick ? 'ci-quick' : 'ci-open'}" data-id="${r.id}">${quick ? 'تثبيت الحضور' : 'تسجيل الحضور…'}</button>${quick && el.length > 1 ? ` <button class="btn link" data-act="ci-open" data-id="${r.id}">اختيار</button>` : ''}` : '<span class="tag ok">حاضر</span>'}</td></tr>`;
   };
   return `<div class="head"><div><h1>الاستقبال وتسجيل الحضور</h1><p>${esc(d.stageName)} · ${me.role === 'top' ? (f.section ? esc(meta.sections[f.section]) : 'القسمان') : esc(me.sectionName)} · الأسماء مرتبة أبجديًا، والدور في الطابور بحسب وقت تثبيت الحضور</p></div><div class="acts"><a class="btn" href="#queues">الطوابير</a></div></div>
+  ${stageBar()}${S.stage !== 'prelim' ? `<div class="banner info">يظهر في ${esc(d.stageName)} المتأهلون بقرار معتمد فقط.</div>` : ''}
   <div class="kpis"><div class="kpi main"><b>${c.persons || 0}</b><span>حاضرون</span></div><div class="kpi"><b>${c.waiting || 0}</b><span>في الانتظار</span></div><div class="kpi"><b>${c.active || 0}</b><span>نودوا أو جارٍ اختبارهم</span></div><div class="kpi"><b>${c.done || 0}</b><span>انتهى اختبارهم</span></div><div class="kpi"><b>${c.needs || 0}</b><span>بانتظار تحديد اللجنة</span></div></div>
   <div class="card"><form class="filters" data-form="recf" role="search"><input type="search" id="rf-q" value="${esc(f.q)}" placeholder="ابحث بالاسم أو الهوية أو الهاتف" aria-label="بحث" autofocus>
     ${me.role === 'top' ? `<select id="rf-section" aria-label="القسم">${opts(Object.entries(meta.sections), f.section, 'القسمان')}</select>` : ''}
@@ -443,7 +455,7 @@ async function vReception() {
   <p class="note">${d.total} متسابقًا مقبولًا</p>
   ${d.rows.length ? `<div class="scroll"><table class="list stack"><thead><tr><th>الاسم</th><th>الفئة</th><th>المشاركات والحضور</th><th></th></tr></thead><tbody>${d.rows.map(row).join('')}</tbody></table></div>
   <div class="pager"><span class="note">صفحة ${d.page} من ${pages}</span><div class="acts"><button class="btn sm" data-act="rpage" data-p="${d.page - 1}" ${d.page > 1 ? '' : 'disabled'}>السابق</button><button class="btn sm" data-act="rpage" data-p="${d.page + 1}" ${d.page < pages ? '' : 'disabled'}>التالي</button></div></div>`
-    : '<div class="empty"><p>لا يوجد متسابقون مطابقون. يظهر هنا المقبولون فقط.</p></div>'}</div>`;
+    : `<div class="empty"><p>${S.stage === 'prelim' ? 'لا يوجد متسابقون مطابقون. يظهر هنا المقبولون فقط.' : 'لا يوجد متأهلون إلى هذه المرحلة بعد.'}</p></div>`}</div>`;
 }
 function checkinForm(r) {
   const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
@@ -462,7 +474,7 @@ async function doCheckin(regId, items) {
 const since = (t) => { if (!t) return ''; const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 1 ? 'الآن' : `منذ ${m} د`; };
 async function vQueues() {
   const q = S.q = S.q || { section: '' };
-  const d = await api('/queues' + (me.role === 'top' && q.section ? '?section=' + q.section : ''));
+  const d = await api('/queues?stage=' + S.stage + (me.role === 'top' && q.section ? '&section=' + q.section : ''));
   startPoll(3000, repaint);
   const card = (c) => {
     const cur = c.current, w = c.waiting;
@@ -479,6 +491,7 @@ async function vQueues() {
   };
   return `<div class="head"><div><h1>${me.role === 'judge' ? 'طابور لجنتي' : 'الطوابير والنداء'}</h1><p>${esc(d.stageName)} · يتحدث تلقائيًا كل 3 ثوانٍ</p></div>
     <div class="acts">${me.role === 'top' ? [['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${q.section === k ? 'pri' : ''}" data-act="qsec" data-s="${k}">${n}</button>`).join('') : ''}${['exec', 'chief', 'top'].includes(me.role) ? '<a class="btn sm" href="#screen">شاشة الانتظار</a>' : ''}</div></div>
+  ${stageBar()}
   ${d.needsCommittee.length ? `<div class="card warnbox"><h3>بانتظار تحديد اللجنة (${d.needsCommittee.length})</h3>${d.needsCommittee.map((t) => `<div class="acts needs"><span><b>${esc(t.name)}</b> · ${esc(t.branchName)}${t.trackName ? ' · ' + esc(t.trackName) : ''} · ${esc(t.category)} · #${t.seq}</span>
     ${t.candidates.length ? `<select id="as-${t.id}" aria-label="اللجنة">${opts(t.candidates.map((x) => [x.id, x.name]), '', 'اختر اللجنة…')}</select><button class="btn sm pri" data-act="tk-assign" data-id="${t.id}">إسناد</button>` : '<span class="tag bad">لا توجد لجنة مطابقة: أنشئ لجنة من «اللجان»</span>'}</div>`).join('')}</div>` : ''}
   ${d.committees.length ? `<div class="qgrid">${d.committees.map(card).join('')}</div>` : `<div class="card empty"><p>${['judge', 'coordinator'].includes(me.role) ? 'لم تُكلَّف بلجنة بعد.' : 'لا توجد لجان نشطة.'}</p></div>`}`;
@@ -487,7 +500,7 @@ async function vQueues() {
 // ---------- اللجان والتكليفات ----------
 async function vCommittees() {
   const q = S.cm = S.cm || { section: '' };
-  const [{ committees }, staff] = await Promise.all([api('/committees' + (me.role === 'top' && q.section ? '?section=' + q.section : '')), ['exec', 'top'].includes(me.role) ? api('/staff').then((x) => x.staff) : Promise.resolve([])]);
+  const [{ committees }, staff] = await Promise.all([api('/committees?stage=' + S.stage + (me.role === 'top' && q.section ? '&section=' + q.section : '')), ['exec', 'top'].includes(me.role) ? api('/staff').then((x) => x.staff) : Promise.resolve([])]);
   S.committees = committees; S.staff = staff;
   const admin = ['exec', 'top'].includes(me.role);
   const card = (c) => {
@@ -500,6 +513,7 @@ async function vCommittees() {
   };
   return `<div class="head"><div><h1>لجان التحكيم</h1><p>كل لجنة لفرع ومسار وفئات محددة في قسم واحد. يُسند الحاضر تلقائيًا إلى اللجنة المطابقة، وتظهر قاعتها على شاشة الانتظار.</p></div>
     <div class="acts">${me.role === 'top' ? [['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${q.section === k ? 'pri' : ''}" data-act="cmsec" data-s="${k}">${n}</button>`).join('') : ''}${admin ? '<button class="btn pri" data-act="cm-new">إضافة لجنة</button>' : ''}</div></div>
+  ${stageBar()}
   ${admin && !staff.some((u) => u.role === 'judge') ? '<div class="banner info">لا توجد حسابات محكمين في القسم بعد. تنشئها الإدارة العليا من «الحسابات».</div>' : ''}
   <div class="qgrid">${committees.map(card).join('')}</div>`;
 }
@@ -524,7 +538,7 @@ function scopeBoxes(br, c) {
 // ---------- شاشة قاعة الانتظار ----------
 const SCR = { last: 0, first: true, sound: false, section: 'M' };
 async function vScreen() {
-  const d = await api('/screen?since=' + SCR.last + (me.role === 'top' ? '&section=' + SCR.section : ''));
+  const d = await api('/screen?since=' + SCR.last + '&stage=' + S.stage + (me.role === 'top' ? '&section=' + SCR.section : ''));
   const fresh = SCR.first ? [] : d.calls.filter((c) => c.fresh).reverse();
   SCR.first = false; SCR.last = d.lastId;
   if (fresh.length) announce(fresh);
@@ -533,7 +547,7 @@ async function vScreen() {
   return `<div class="scr"><header class="scr-top"><div><b>اقرأ<i>.</i></b> <span>${esc(d.competition)} · ${esc(d.stageName)} · ${esc(d.sectionName)}</span></div>
     <div class="acts"><span class="clock">${new Date().toLocaleTimeString('ar-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}</span>
     ${me.role === 'top' ? `<button class="btn sm ghost" data-act="ssec">${SCR.section === 'M' ? 'عرض قسم النساء' : 'عرض قسم الرجال'}</button>` : ''}
-    <button class="btn sm ${SCR.sound ? 'gold' : 'ghost'}" data-act="sound">${SCR.sound ? 'الصوت مفعّل' : 'تفعيل الصوت'}</button><button class="btn sm ghost" data-act="fs">ملء الشاشة</button>${me.role !== 'screen' ? `<a class="btn sm ghost" href="#${homeOf()}">خروج من الشاشة</a>` : ''}</div></header>
+    <select class="scr-stage" id="scr-stage" aria-label="المرحلة">${opts(STG, S.stage)}</select><button class="btn sm ${SCR.sound ? 'gold' : 'ghost'}" data-act="sound">${SCR.sound ? 'الصوت مفعّل' : 'تفعيل الصوت'}</button><button class="btn sm ghost" data-act="fs">ملء الشاشة</button>${me.role !== 'screen' ? `<a class="btn sm ghost" href="#${homeOf()}">خروج من الشاشة</a>` : ''}</div></header>
   <section class="scr-now ${top && top.fresh ? 'flash' : ''}">${top ? `<p class="lbl">${top.kind === 'recall' ? 'نداء متكرر' : 'النداء الحالي'}</p><h1>${esc(top.name)}</h1><p class="to">يتوجه إلى <b>${esc(top.committee)}</b>${top.hall ? ` · <b>${esc(top.hall)}</b>` : ''}</p>` : '<p class="lbl">قاعة الانتظار</p><h1>أهلًا بكم</h1><p class="to">ستظهر هنا أسماء المتسابقين عند نداء لجانهم</p>'}</section>
   <div class="scr-body"><div class="scr-grid">${d.committees.map((k) => `<div class="scr-c ${k.current ? 's-' + k.current.status : ''}"><span class="scr-h">${esc(k.name)}<small>${esc(k.hall)}</small></span><b>${k.current ? esc(k.current.name) : '—'}</b><span class="scr-st">${k.current ? esc(k.current.statusName) : 'بانتظار النداء'} · منتظر ${k.waiting}</span></div>`).join('')}</div>
   <aside class="scr-log"><h2>آخر النداءات</h2><ol>${d.calls.slice(0, 8).map((c) => `<li><b>${esc(c.name)}</b><span>${esc(c.committee)}${c.hall ? ' · ' + esc(c.hall) : ''}</span></li>`).join('') || '<li>لا نداءات بعد</li>'}</ol></aside></div></div>`;
@@ -555,9 +569,9 @@ const n2 = (x) => (x == null ? '—' : (Math.round(x * 100) / 100).toLocaleStrin
 const EV = { none: ['', 'لم يبدأ'], draft: ['warn', 'مسودة'], submitted: ['ok', 'أُرسل'] };
 async function vGrade() {
   if (S.fm) return gradeForm();
-  const d = await api('/judge/work');
+  const d = await api('/judge/work?stage=' + S.stage);
   startPoll(8000, () => { if (!S.fm) repaint(); });
-  return `<div class="head"><div><h1>الرصد</h1><p>${esc(me.specialty)} · ${esc(d.stageName)} · يظهر المتسابق هنا بعد بدء اختباره في لجنتك</p></div></div>
+  return `<div class="head"><div><h1>الرصد</h1><p>${esc(me.specialty)} · ${esc(d.stageName)} · يظهر المتسابق هنا بعد بدء اختباره في لجنتك</p></div></div>${stageBar()}
   ${d.committees.length ? d.committees.map((k) => `<div class="card"><div class="qh"><div><h2>${esc(k.name)}</h2><span class="note">${esc(k.hall || '')} · ${k.rubric ? esc(k.rubricTitle) : 'تخصصك لا يقابل استمارة في هذه اللجنة'}</span></div></div>
     ${k.rows.length ? `<table class="list stack"><thead><tr><th>المتسابق</th><th>الفئة</th><th>الاختبار</th><th>استمارتي</th><th></th></tr></thead><tbody>${k.rows.map((r) => `<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.category)}${r.trackName ? ' · ' + esc(r.trackName) : ''}</td><td><span class="tag ${r.status === 'testing' ? 'plum' : ''}">${r.status === 'testing' ? 'قيد الاختبار' : 'انتهى'}</span></td>
       <td><span class="tag ${EV[r.evalStatus][0]}">${EV[r.evalStatus][1]}${r.raw != null ? ' · ' + n2(r.raw) + ' من ' + n2(r.base) : ''}</span></td><td>${k.rubric ? `<button class="btn sm ${r.evalStatus === 'submitted' ? '' : 'pri'}" data-act="fm-open" data-id="${r.ticketId}">${r.evalStatus === 'submitted' ? 'عرض' : r.evalStatus === 'draft' ? 'متابعة الرصد' : 'رصد'}</button>` : ''}</td></tr>`).join('')}</tbody></table>`
@@ -639,18 +653,31 @@ async function fmSave(submit) {
 async function vResults() {
   const q = S.res = S.res || { section: '', branch: '' };
   const qs = new URLSearchParams(Object.entries(q).filter(([, v]) => v)).toString();
-  const d = await api('/results?' + qs);
+  const d = S.resData = await api('/results?' + qs + '&stage=' + S.stage);
   return `<div class="head"><div><h1>النتائج وكشف الترتيب</h1><p>${esc(d.stageName)} · تُحسب تلقائيًا من الاستمارات المرسلة، والمتعادلون يأخذون الترتيب نفسه. يظهر هنا من بدأ اختباره أو أنهاه.</p></div>
-    <div class="acts"><button class="btn" data-act="csv" data-href="/api/results.csv?${esc(qs)}">تصدير الكشف إلى Excel (CSV)</button></div></div>
+    <div class="acts"><button class="btn" data-act="csv" data-href="/api/results.csv?${esc(qs)}&stage=${S.stage}">تصدير الكشف إلى Excel (CSV)</button></div></div>${stageBar()}
   <div class="filters">${me.role === 'top' ? `<select id="rs-section" aria-label="القسم">${opts(Object.entries(meta.sections), q.section, 'القسمان')}</select>` : ''}<select id="rs-branch" aria-label="الفرع">${opts([['hifz', 'الحفظ'], ['tilawa', 'التلاوة']], q.branch, 'كل الفروع')}</select></div>
-  ${d.groups.length ? d.groups.map((g) => { const parts = (g.ranked[0] || g.pending[0]).parts; return `<div class="card"><h2>${esc(g.name)}</h2><p class="note">${esc(g.sectionName)} · المكتمل ${g.ranked.length} · غير المكتمل ${g.pending.length}</p>
+  ${d.groups.length ? d.groups.map((g, gi) => { const first = g.ranked[0] || g.pending[0]; const parts = first ? first.parts : []; const sh = g.sheet;
+    const st = !sh ? '<span class="tag">محسوبة، لم تُعتمد</span>' : sh.stale ? '<span class="tag bad">تحتاج إعادة اعتماد</span>' : sh.status === 'published' ? `<span class="tag ok">منشورة · نسخة ${sh.version}</span>` : `<span class="tag info">معتمدة · نسخة ${sh.version}</span>`;
+    const acts = [
+      g.canApprove && (!sh || sh.stale) ? `<button class="btn sm pri" data-act="approve" data-g="${gi}">${sh ? 'إعادة اعتماد الكشف' : 'اعتماد الكشف'}</button>` : '',
+      me.role === 'top' && sh && !sh.stale ? `<button class="btn sm" data-act="publish" data-id="${sh.id}" data-p="${sh.status === 'published' ? 0 : 1}">${sh.status === 'published' ? 'إيقاف النشر' : 'نشر للمتسابقين'}</button>` : '',
+      g.nextStage && sh && !sh.stale ? `<button class="btn sm" data-act="qualify" data-g="${gi}">التأهل إلى ${esc(g.nextStageName)}…</button>` : '',
+    ].join('');
+    return `<div class="card"><div class="qh"><div><h2>${esc(g.name)}</h2><p class="note">${esc(g.sectionName)} · المكتمل ${g.ranked.length} · غير المكتمل ${g.pending.length}${g.untested ? ` · لم يُختبر بعد ${g.untested}` : ''}${g.nextStage && g.qualifiedCount ? ` · المتأهلون إلى ${esc(g.nextStageName)}: ${g.qualifiedCount}` : ''}</p></div><div class="acts">${st}${acts}</div></div>
+    ${g.untested && !g.ranked.length && !g.pending.length ? '<p class="note">لم يبدأ اختبار أحد في هذه المجموعة بعد.</p>' : ''}
     <div class="scroll"><table class="list stack"><thead><tr><th class="n">الترتيب</th><th>المتسابق</th>${g.allAges ? '<th>الفئة</th>' : ''}${parts.map((p) => `<th class="n">${esc(p.n)} (${p.weight})</th>`).join('')}<th class="n">المجموع (${g.max})</th></tr></thead><tbody>
-    ${g.ranked.map((r) => `<tr class="click" data-act="res" data-id="${r.entryId}" tabindex="0"><td class="n"><b>${r.rank}</b>${r.tie ? ' <span class="tag warn">تعادل</span>' : ''}</td><td><b>${esc(r.name)}</b></td>${g.allAges ? `<td>${esc(r.category)}</td>` : ''}${r.parts.map((p) => `<td class="n">${n2(p.value)}</td>`).join('')}<td class="n"><b>${n2(r.total)}</b></td></tr>`).join('')}
+    ${g.ranked.map((r) => `<tr class="click" data-act="res" data-id="${r.entryId}" tabindex="0"><td class="n"><b>${r.rank}</b>${r.tie ? ' <span class="tag warn">تعادل</span>' : ''}</td><td><b>${esc(r.name)}</b>${r.qualified === 'qualified' ? ` <span class="tag ok">متأهل${r.exceptional ? ' (استثناء)' : ''}</span>` : r.qualified === 'excluded' ? ' <span class="tag">غير متأهل</span>' : ''}</td>${g.allAges ? `<td>${esc(r.category)}</td>` : ''}${r.parts.map((p) => `<td class="n">${n2(p.value)}</td>`).join('')}<td class="n"><b>${n2(r.total)}</b></td></tr>`).join('')}
     ${g.pending.map((r) => `<tr class="click pend" data-act="res" data-id="${r.entryId}" tabindex="0"><td class="n">—</td><td><b>${esc(r.name)}</b><br><small class="note">بانتظار: ${r.missing.map((m) => esc(m.n)).join('، ')}</small></td>${g.allAges ? `<td>${esc(r.category)}</td>` : ''}${r.parts.map((p) => `<td class="n">${n2(p.value)}</td>`).join('')}<td class="n"><span class="tag warn">غير مكتملة</span></td></tr>`).join('')}
     </tbody></table></div></div>`; }).join('') : '<div class="card empty"><p>لا توجد نتائج بعد. تظهر هنا بعد حضور المتسابقين وبدء الرصد.</p></div>'}`;
 }
+function qualifyForm(g) {
+  modal('التأهل إلى ' + g.nextStageName + ': ' + g.name, `<p class="note">يقترح النظام القائمة من الكشف المعتمد. التعادل على المقعد الأخير لا يُفصل آليًا، ويحتاج قرارًا صريحًا بسببه. أي قرار يخالف المقترح يُسجَّل استثناءً بسببه.</p>
+  <form data-form="qprev" data-g="${S.resData.groups.indexOf(g)}"><p class="err" hidden></p><div class="row3"><div class="field"><label for="q-mode">القاعدة</label><select id="q-mode">${opts([['count', 'عدد المتأهلين'], ['score', 'حد الدرجة']], 'count')}</select></div>
+  <div class="field"><label for="q-val">القيمة</label><input id="q-val" inputmode="decimal" required></div><div class="field"><label>&nbsp;</label><button class="btn" type="submit">معاينة القائمة</button></div></div><div id="q-list"></div></form>`);
+}
 async function openResult(entryId) {
-  const d = await api('/results/entry/' + entryId), c = d.contestant, r = d.result;
+  const d = await api('/results/entry/' + entryId + '?stage=' + S.stage), c = d.contestant, r = d.result;
   modal(c.name, `<p class="note">${esc(c.category)} · ${esc(c.branchName)}${c.trackName ? ' · ' + esc(c.trackName) : ''} · ${esc(c.committee)} · ${esc(c.stageName)}</p><p class="err" hidden></p>
   <table class="review"><tbody>${r.parts.map((p) => `<tr><th>${esc(p.n)} (من ${p.weight})</th><td><b>${n2(p.value)}</b>${p.judges.length > 1 && p.judges.some((x) => x != null) ? ` <span class="note">المحكمون: ${p.judges.map(n2).join(' و')}${p.bases ? ' من ' + n2(p.bases[0]) : ''}</span>` : p.judges[0] != null && p.bases ? ` <span class="note">الخام ${n2(p.judges[0])} من ${n2(p.bases[0])}</span>` : ''}</td></tr>`).join('')}
   <tr><th>المجموع (من ${r.max})</th><td><b>${r.complete ? n2(r.total) : 'غير مكتمل'}</b></td></tr></tbody></table>
@@ -714,6 +741,20 @@ document.addEventListener('click', async (e) => {
     else if (a === 'edit-user') { userForm(S.users.find((u) => u.id === +id)); specToggle(); }
     else if (a === 'reset-u') { const u = S.users.find((x) => x.id === +id); const r = await api(`/users/${id}/reset`, { method: 'POST' }); pwBox('كلمة مرور مؤقتة', u.login, r.tempPassword); }
     else if (a === 'toggle-u') { const u = S.users.find((x) => x.id === +id); await api('/users/' + id, { method: 'PATCH', body: { active: !u.active } }); toast(u.active ? 'أُوقف الحساب' : 'فُعّل الحساب'); render(); }
+    else if (a === 'stage') { S.stage = b.dataset.s; S.fm = null; render(); }
+    else if (a === 'approve') { const g = S.resData.groups[+b.dataset.g]; await api('/results/approve', { method: 'POST', body: { stage: S.stage, groupKey: g.key } }); toast('اعتُمد الكشف: ' + g.name); render(); }
+    else if (a === 'publish') { await api('/results/publish', { method: 'POST', body: { sheetId: +id, publish: b.dataset.p === '1' } }); toast(b.dataset.p === '1' ? 'نُشر الكشف للمتسابقين' : 'أُوقف النشر'); render(); }
+    else if (a === 'qualify') qualifyForm(S.resData.groups[+b.dataset.g]);
+    else if (a === 'q-approve') {
+      const f = $('#dlg form'), g = S.resData.groups[+f.dataset.g], rows = S.qprev.rows;
+      const decisions = rows.map((r) => ({ entryId: r.entryId, qualified: $('#qd-' + r.entryId).checked, reason: val('qr-' + r.entryId) })).filter((d, i) => d.qualified !== rows[i].proposed || rows[i].tieAtCut);
+      await api('/qualify/approve', { method: 'POST', body: { stage: S.stage, groupKey: g.key, mode: val('q-mode'), value: val('q-val'), decisions } });
+      closeModal(); toast('اعتُمدت قائمة التأهل'); render();
+    }
+    else if (a === 'sp-save') {
+      const rows = $$('#sp-rows tr').map((tr) => ({ id: +tr.dataset.id, semi: { surah: $('[name=ss]', tr).value, ayahFrom: $('[name=sf]', tr).value, ayahTo: $('[name=st]', tr).value }, final: { surah: $('[name=fs]', tr).value, ayahFrom: $('[name=ff]', tr).value, ayahTo: $('[name=ft]', tr).value } }));
+      await api('/admin/stage-passages', { method: 'PUT', body: { rows } }); toast('حُفظت مقاطع المراحل');
+    }
     // الرصد
     else if (a === 'fm-open') await openForm(+id);
     else if (a === 'fm-back') { if (S.fm && S.fm.dirty && b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'توجد تعديلات غير محفوظة. اضغط مرة أخرى للخروج'; return; } S.fm = null; render(); }
@@ -767,6 +808,8 @@ document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'u-r') specToggle();
   if (t.id === 'u-role') { S.usersRole = t.value; render(); }
+  if (t.id === 'scr-stage') { S.stage = t.value; SCR.first = true; SCR.last = 0; repaint(); }
+  if (t.dataset.qd && S.qprev) { const r = S.qprev.rows.find((x) => x.entryId === +t.dataset.qd); const box = $('#qrw-' + t.dataset.qd); if (box) box.hidden = !(r.tieAtCut || t.checked !== r.proposed); }
   if (['rs-section', 'rs-branch'].includes(t.id)) { S.res[t.id.slice(3)] = t.value; render(); }
   if (t.dataset.fc && S.fm) { S.fm.data[t.dataset.fc] = t.value === '' ? null : +t.value; S.fm.dirty = true; fmPaint(); }
   if (t.dataset.fx && S.fm) { S.fm.data[t.dataset.fx] = +t.value; S.fm.dirty = true; fmPaint(); }
@@ -808,6 +851,14 @@ document.addEventListener('submit', async (e) => {
     }
     else if (k === 'withdraw') { await api('/my/withdraw', { method: 'POST', body: { reason: val('wd-r') } }); closeModal(); toast('سُجّل انسحابك'); render(); }
     else if (k === 'phones') { await api('/my/profile', { method: 'PATCH', body: { phone: val('ph-1'), phone2: val('ph-2') } }); closeModal(); toast('حُفظت أرقام التواصل'); render(); }
+    else if (k === 'qprev') {
+      const g = S.resData.groups[+f.dataset.g];
+      const p = S.qprev = await api('/qualify/preview', { method: 'POST', body: { stage: S.stage, groupKey: g.key, mode: val('q-mode'), value: val('q-val') } });
+      $('#q-list').innerHTML = `${p.tie ? '<p class="banner">تعادل على المقعد الأخير: حدّد قرار المتعادلين وسببه وفق اللائحة.</p>' : ''}<table class="list"><thead><tr><th class="n">الترتيب</th><th>المتسابق</th><th class="n">المجموع</th><th>متأهل إلى ${esc(p.nextStageName)}</th></tr></thead><tbody>
+        ${p.rows.map((r) => `<tr class="${r.tieAtCut ? 'pend' : ''}"><td class="n">${r.rank}</td><td>${esc(r.name)}${r.tieAtCut ? ' <span class="tag warn">تعادل على المقعد الأخير</span>' : ''}</td><td class="n">${n2(r.total)}</td>
+          <td><label class="check"><input type="checkbox" id="qd-${r.entryId}" data-qd="${r.entryId}" ${r.proposed ? 'checked' : ''}>${r.proposed ? 'مقترح' : ''}</label><div id="qrw-${r.entryId}" ${r.tieAtCut ? '' : 'hidden'}><input id="qr-${r.entryId}" placeholder="سبب القرار" aria-label="سبب القرار"></div></td></tr>`).join('')}</tbody></table>
+        <div class="acts"><button class="btn pri" type="button" data-act="q-approve">اعتماد قائمة التأهل (${esc(p.rule)})</button></div>`;
+    }
     else if (k === 'recf') { S.rec.q = val('rf-q'); S.rec.page = 1; await render(); const i = $('#rf-q'); if (i) { i.focus(); i.select(); } }
     else if (k === 'checkin') {
       const items = $$('input[name=e]:checked', f).map((x) => { const sel = f.elements['c-' + x.value]; return { entryId: +x.value, committeeId: sel ? sel.value || null : undefined }; });
@@ -819,6 +870,7 @@ document.addEventListener('submit', async (e) => {
       const id = f.dataset.id;
       const body = { name: val('k-n'), hall: val('k-h'), branch: val('k-b'), tracks: $$('[name=kt]:checked', f).map((x) => x.value), categories: $$('[name=kc]:checked', f).map((x) => +x.value) };
       if ($('#k-s')) body.section = val('k-s');
+      body.stage = S.stage;
       if (id) { body.active = $('#k-a').checked; await api('/committees/' + id, { method: 'PUT', body }); } else await api('/committees', { method: 'POST', body });
       closeModal(); toast('حُفظت اللجنة'); render();
     }

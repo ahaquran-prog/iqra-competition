@@ -287,3 +287,7 @@ table.crit select{min-width:110px}
 .bsm td{text-align:center!important;background:var(--soft)!important}
 .note-in{min-width:160px;min-height:40px;font-size:14px}
 tr.pend td{background:#fffaf0}
+.stagebar{display:flex;gap:6px;flex-wrap:wrap;margin:-6px 0 16px}
+.scr-stage{width:auto;min-height:36px;padding:4px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+.scr-stage option{color:#000}
+.myres{grid-column:1/-1;margin:6px 0 0;background:var(--soft);border-radius:10px;padding:10px 12px}
