@@ -918,7 +918,7 @@ async function vDays() {
   if (S.dpeople.day !== '' && !S.dpeople.rows) S.dpeople.rows = (await api(`/days/people?section=${sec}&day=${S.dpeople.day}`)).rows;
   const dayOpts = [...d.days.map((x) => [x.id, `${x.name} · ${x.label}`]), ['none', 'غير موزّعين']];
   return `<div class="head"><div><h1>توزيع المتسابقين على أيام التصفيات</h1><p>حدد أيام التصفيات الأولية وسعة كل يوم لكل فرع وفئة، ثم اطلب التوزيع وراجعه، ثم اعتمده وانشره فيصل كل متسابق يومه. يُجمع صاحب أكثر من مشاركة في يوم واحد ما أمكن.</p></div>
-    ${me.role === 'top' ? `<div class="acts">${['M', 'F'].map((x) => `<button class="btn ${x === sec ? 'pri' : ''}" data-act="dsec" data-s="${x}">${esc(meta.sections[x])}</button>`).join('')}</div>` : ''}</div>
+    ${me.role === 'top' ? `<div class="acts">${['M', 'F'].map((x) => `<button class="btn ${x === sec ? 'pri' : ''}" data-act="daysec" data-s="${x}">${esc(meta.sections[x])}</button>`).join('')}</div>` : ''}</div>
   <div class="banner ${st[0] === 'ok' ? 'info' : 'warn'}"><b>${esc(st[1])}</b>${d.publishedAt ? ` · آخر نشر ${esc(fmt(d.publishedAt))}` : ''}${d.regClose ? ` · إغلاق التسجيل ${esc(d.regClose)}` : ''}</div>
   <div class="kpis"><div class="kpi main"><b>${d.persons}</b><span>متسابقًا في الفروع الميدانية</span></div><div class="kpi"><b>${d.entries}</b><span>مشاركة</span></div><div class="kpi"><b>${d.unassigned}</b><span>غير موزّعة</span></div><div class="kpi"><b>${d.checkedIn}</b><span>حضرت</span></div></div>
   <div class="card"><h2>الأيام والسعة</h2><form data-form="dplan"><p class="err" hidden></p>
@@ -1079,7 +1079,7 @@ document.addEventListener('click', async (e) => {
       if (a === 'dr-draw') await new Promise((ok) => setTimeout(ok, 600));
       toast(a === 'dr-ok' ? 'اعتُمد مقطعك' : `ظهر لك: ${r.state.current.label}`); render();
     }
-    else if (a === 'dsec') { S.dsec = b.dataset.s; S.dplanDirty = false; S.dpeople = null; render(); }
+    else if (a === 'daysec') { S.dsec = b.dataset.s; S.dplanDirty = false; S.dpeople = null; render(); }
     else if (a === 'dp-even') {
       const P = S.dplan;
       for (const g of S.dd.groups) { const per = Math.floor(g.registered / P.n), extra = g.registered % P.n; for (let i = 1; i <= P.n; i++) P.caps[`${i}|${g.key}`] = per + (i <= extra ? 1 : 0); }

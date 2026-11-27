@@ -29,6 +29,11 @@ function client(base) {
   const srv = app.listen(0); const base = `http://127.0.0.1:${srv.address().port}`;
   const admin = client(base);
   try {
+    console.log('سلامة الواجهة');
+    { const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+      const heads = [...src.matchAll(/else if \(a === '([\w-]+)'/g)].map((m) => m[1]);
+      const dup = heads.filter((x, i) => heads.indexOf(x) !== i);
+      ok('لا يتكرر اسم زر في معالج النقرات (كل زر يصل إلى صفحته)', !dup.length, dup); }
     console.log('الدخول والحسابات');
     let r = await admin('POST', '/api/login', { login: 'admin', password: 'Admin-12345' });
     ok('دخول الإدارة العليا', r.status === 200 && r.data.user.role === 'top');
