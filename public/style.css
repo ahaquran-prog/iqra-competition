@@ -1,11 +1,12 @@
-/* هوية اقرأ: بنفسجي #352547 مسيطر، ذهبي للتمييز، عربي من اليمين إلى اليسار */
-:root{color-scheme:light;--plum:#352547;--plum2:#4b3663;--plum3:#6b5288;--gold:#d8a73e;--goldi:#8a6414;
---bg:#f7f5fa;--card:#fff;--ink:#1d1626;--mute:#685d76;--line:#e5dfee;--soft:#f0ebf6;
+/* هوية مسابقة اقرأ (من إعلان الدورة 20): بنفسجي داكن للترويسة، خلفية عاجية بزخرفة هندسية خفيفة،
+   نحاسي للتمييز، ذهبي للمؤشرات، رملي للنص على الداكن. الخط: IBM Plex Sans Arabic */
+:root{color-scheme:light;--night:#1f1130;--plum:#2e1a42;--plum2:#4a2f63;--plum3:#7a6190;--gold:#c59b55;--goldi:#8e5e47;--copper:#9a6650;--sand:#e7ded2;
+--bg:#f4f3ee;--card:#fff;--ink:#1a1420;--mute:#6a6170;--line:#e2ded8;--soft:#efebe5;
 --ok:#21784f;--okbg:#e3f4ea;--bad:#a8342c;--badbg:#fbe7e4;--warn:#8a5a00;--warnbg:#fdf1d8;--info:#2f4f8a;--infobg:#e6edf9}
 *{box-sizing:border-box;min-width:0}
 html{scroll-padding-top:120px}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 "IBM Plex Sans Arabic",Tahoma,sans-serif;overflow-x:clip}
-h1,h2,h3{font-family:"Reem Kufi","IBM Plex Sans Arabic",sans-serif;line-height:1.2;text-wrap:balance;margin:0 0 .45em;font-weight:600}
+h1,h2,h3{font-family:"IBM Plex Sans Arabic",sans-serif;line-height:1.2;text-wrap:balance;margin:0 0 .45em;font-weight:600}
 h1{font-size:clamp(28px,4vw,44px)}h2{font-size:23px}h3{font-size:18px}
 p{margin:0 0 .8em}
 a{color:var(--plum2)}
@@ -17,8 +18,7 @@ a{color:var(--plum2)}
 header.top{background:var(--plum);color:#fff;position:sticky;top:0;z-index:20}
 .tbar{display:flex;align-items:center;gap:14px;padding:10px max(4vw,16px);max-width:1320px;margin-inline:auto;flex-wrap:wrap}
 .logo{display:flex;align-items:baseline;gap:10px;text-decoration:none;color:#fff}
-.logo b{font:700 30px/1 "Reem Kufi",sans-serif}.logo b i{color:var(--gold);font-style:normal}
-.logo span{font-size:13px;opacity:.78}
+.logo b{font:700 30px/1 "IBM Plex Sans Arabic",sans-serif}.logo b i{color:var(--gold);font-style:normal}
 .who{margin-inline-start:auto;display:flex;align-items:center;gap:10px;font-size:14px;flex-wrap:wrap}
 .who .chip{background:rgba(255,255,255,.12);border-radius:999px;padding:4px 12px}
 .who .chip b{color:var(--gold);font-weight:600}
@@ -80,11 +80,11 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;accen
 .glyph{display:inline-grid;place-items:center;width:60px;height:60px;border-radius:16px;background:var(--gold);color:var(--plum);font:700 34px "Amiri",serif;margin-bottom:10px}
 .quote blockquote{margin:0;font:700 clamp(22px,2.4vw,30px)/1.5 "Amiri",serif}
 .quote figcaption{font-size:13px;opacity:.7}
-.motto{margin:14px 0 0;padding-top:12px;border-top:1px solid rgba(255,255,255,.15);color:var(--gold);font-family:"Reem Kufi";font-size:18px}
+.motto{margin:14px 0 0;padding-top:12px;border-top:1px solid rgba(255,255,255,.15);color:var(--gold);font-family:"IBM Plex Sans Arabic";font-size:18px}
 .sec-title{margin:34px 0 14px}
 .cats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .cat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
-.cat b{font:600 18px "Reem Kufi"}.cat .yrs{display:block;font-variant-numeric:tabular-nums;color:var(--plum2);font-weight:600}
+.cat b{font:600 18px "IBM Plex Sans Arabic"}.cat .yrs{display:block;font-variant-numeric:tabular-nums;color:var(--plum2);font-weight:600}
 .cat .br{font-size:13px;color:var(--mute)}
 .branches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .branch{display:flex;flex-direction:column;gap:10px}
@@ -97,7 +97,7 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;accen
 .subhead{margin:6px 0 2px;font-weight:700;color:var(--plum2)}
 .branch .acts{margin-top:auto;padding-top:6px}
 .assoc{margin-top:34px;background:var(--soft);border-radius:18px;padding:22px 26px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
-.assoc h2{margin:0}.assoc p{margin:0;font-family:"Reem Kufi";font-size:19px;color:var(--goldi)}
+.assoc h2{margin:0}.assoc p{margin:0;font-family:"IBM Plex Sans Arabic";font-size:19px;color:var(--goldi)}
 
 /* الدخول */
 .auth{max-width:480px;margin:20px auto}
@@ -111,7 +111,7 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;accen
 .steps li.now{background:var(--plum);color:#fff}.steps li.now::before{border-color:var(--gold);color:var(--plum)}
 .steps li.done::before{content:"✓";background:var(--gold);border-color:var(--gold);color:var(--plum)}
 .catbox{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:var(--soft);margin-bottom:14px}
-.catbox b{font:600 20px "Reem Kufi";color:var(--plum)}
+.catbox b{font:600 20px "IBM Plex Sans Arabic";color:var(--plum)}
 .pick{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px;background:#fff}
 .pick.on{border-color:var(--plum3);box-shadow:inset -4px 0 0 var(--gold)}
 .pick>.check{font-weight:700;font-size:17px}
@@ -125,7 +125,7 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;accen
 
 /* مشاركتي */
 .status{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-.status .big{font:700 26px "Reem Kufi";color:var(--plum)}
+.status .big{font:700 26px "IBM Plex Sans Arabic";color:var(--plum)}
 .entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;padding:14px 0;border-bottom:1px solid var(--line)}
 .entry:last-child{border-bottom:0}
 .entry.off{opacity:.55}
@@ -188,12 +188,12 @@ dialog .db{padding:20px 22px}
 #toast{position:fixed;bottom:20px;inset-inline:0;margin-inline:auto;width:max-content;max-width:calc(100% - 32px);background:#241a30;color:#fff;border-radius:12px;padding:12px 18px;z-index:60;opacity:0;translate:0 20px;pointer-events:none;transition:.25s}
 #toast.on{opacity:1;translate:0 0}
 footer{background:var(--plum);color:#dccfee;text-align:center;padding:26px 16px;font-size:14px}
-footer b{color:#fff;font-family:"Reem Kufi";font-size:17px}footer p{margin:4px 0}
+footer b{color:#fff;font-family:"IBM Plex Sans Arabic";font-size:17px}footer p{margin:4px 0}
 
 @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.cats{grid-template-columns:repeat(3,minmax(0,1fr))}.hero-in,.grid2,.branches{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:640px){
   .kpis,.cats{grid-template-columns:repeat(2,minmax(0,1fr))}.row2,.row3{grid-template-columns:minmax(0,1fr)}
-  .steps{grid-template-columns:minmax(0,1fr)}.logo span{display:none}
+  .steps{grid-template-columns:minmax(0,1fr)}
   .meter{grid-template-columns:minmax(0,1fr) 3em}.meter .t{grid-column:1/-1;grid-row:2}
   table.stack thead{display:none}table.stack tr{display:grid;padding:10px 0;border-bottom:1px solid var(--line)}
   table.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:7.5em}
@@ -219,7 +219,7 @@ dialog .db h3{margin-top:22px}dialog .db .kv{margin-top:12px}
 .qcard{display:flex;flex-direction:column;gap:12px;border-top:5px solid var(--line)}
 .qcard.q-called{border-top-color:var(--gold)}.qcard.q-testing{border-top-color:var(--plum2)}
 .qcur{background:var(--soft);border-radius:12px;padding:14px;min-height:92px;display:flex;flex-direction:column;gap:4px;justify-content:center}
-.qcur b{font:700 22px/1.3 "Reem Kufi"}.qcur small{color:var(--mute)}
+.qcur b{font:700 22px/1.3 "IBM Plex Sans Arabic"}.qcur small{color:var(--mute)}
 .qcur .tag{align-self:flex-start}
 .big-btn{min-height:56px;font-size:18px;flex:1}
 .qlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
@@ -236,7 +236,7 @@ body.screen-mode main{max-width:none;padding:0}
 body.screen-mode{background:#1f1529}
 .scr{min-height:100vh;color:#fff;background:#1f1529;display:flex;flex-direction:column}
 .scr-top{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 28px;background:var(--plum);flex-wrap:wrap}
-.scr-top b{font:700 30px "Reem Kufi"}.scr-top b i{color:var(--gold);font-style:normal}.scr-top span{opacity:.85}
+.scr-top b{font:700 30px "IBM Plex Sans Arabic"}.scr-top b i{color:var(--gold);font-style:normal}.scr-top span{opacity:.85}
 .clock{font:700 26px "IBM Plex Sans Arabic";font-variant-numeric:tabular-nums;color:var(--gold)}
 .scr-now{text-align:center;padding:clamp(24px,4vw,56px) 20px;background:linear-gradient(180deg,#352547,#2a1d38);border-bottom:4px solid var(--gold)}
 .scr-now .lbl{font-size:clamp(18px,2vw,26px)}
@@ -248,8 +248,8 @@ body.screen-mode{background:#1f1529}
 .scr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;align-content:start}
 .scr-c{background:#2d2140;border:1px solid #47365e;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:6px;border-top:6px solid #47365e}
 .scr-c.s-called{border-top-color:var(--gold);background:#3a2b16}.scr-c.s-testing{border-top-color:#8f74b3}
-.scr-h{font:600 20px "Reem Kufi";color:#e7dcf3;display:flex;justify-content:space-between;gap:8px}.scr-h small{color:var(--gold);font:600 16px "IBM Plex Sans Arabic"}
-.scr-c b{font:700 clamp(24px,2.4vw,34px)/1.25 "Reem Kufi"}
+.scr-h{font:600 20px "IBM Plex Sans Arabic";color:#e7dcf3;display:flex;justify-content:space-between;gap:8px}.scr-h small{color:var(--gold);font:600 16px "IBM Plex Sans Arabic"}
+.scr-c b{font:700 clamp(24px,2.4vw,34px)/1.25 "IBM Plex Sans Arabic"}
 .scr-st{color:#c9b9de;font-size:16px}
 .scr-log{background:#2d2140;border-radius:16px;padding:18px}
 .scr-log h2{color:var(--gold)}.scr-log ol{list-style:none;margin:0;padding:0}
@@ -294,7 +294,7 @@ tr.pend td{background:#fffaf0}
 
 /* اختبار التفسير */
 .exam-top{position:sticky;top:calc(var(--hh,0px) + 8px);z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--plum);color:#fff;border-radius:14px;padding:12px 18px;margin-bottom:16px}
-.exam-top .note{color:#d9cce9}.exam-top b{display:block;font:600 18px "Reem Kufi"}
+.exam-top .note{color:#d9cce9}.exam-top b{display:block;font:600 18px "IBM Plex Sans Arabic"}
 .timer{font:700 30px "IBM Plex Sans Arabic";font-variant-numeric:tabular-nums;color:var(--gold);direction:ltr}
 .timer.low{color:#ff9b8f;animation:flash 1s infinite}
 .qs{list-style:none;margin:0;padding:0;display:grid;gap:12px}
@@ -335,3 +335,59 @@ details.bank summary{display:flex;gap:8px;align-items:center}
 .head.sm{margin:0 0 8px;align-items:center}
 .head.sm h2{margin:0}
 .err{white-space:pre-line}
+
+/* ===== الهوية ===== */
+body{background:var(--bg) linear-gradient(rgba(244,243,238,.965),rgba(244,243,238,.965)),url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22220%22%20height%3D%22220%22%20viewBox%3D%220%200%20120%20120%22%3E%3Cg%20fill%3D%22%231a1420%22%3E%3Cg%20id%3D%22s%22%3E%3Crect%20x%3D%2230%22%20y%3D%2230%22%20width%3D%2260%22%20height%3D%2260%22/%3E%3Crect%20x%3D%2230%22%20y%3D%2230%22%20width%3D%2260%22%20height%3D%2260%22%20transform%3D%22rotate%2845%2060%2060%29%22/%3E%3C/g%3E%3Cuse%20href%3D%22%23s%22%20x%3D%22-60%22%20y%3D%22-60%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%2260%22%20y%3D%22-60%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%22-60%22%20y%3D%2260%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%2260%22%20y%3D%2260%22/%3E%3C/g%3E%3C/svg%3E") 0 0/220px 220px fixed}
+header.top{background:radial-gradient(60% 140% at 0% 0%,rgba(150,96,64,.28),transparent 70%),radial-gradient(50% 120% at 60% 0%,rgba(98,52,140,.35),transparent 70%),linear-gradient(rgba(31,17,48,.94),rgba(31,17,48,.94)),url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22150%22%20height%3D%22150%22%20viewBox%3D%220%200%20120%20120%22%3E%3Cg%20fill%3D%22%23ffffff%22%3E%3Cg%20id%3D%22s%22%3E%3Crect%20x%3D%2230%22%20y%3D%2230%22%20width%3D%2260%22%20height%3D%2260%22/%3E%3Crect%20x%3D%2230%22%20y%3D%2230%22%20width%3D%2260%22%20height%3D%2260%22%20transform%3D%22rotate%2845%2060%2060%29%22/%3E%3C/g%3E%3Cuse%20href%3D%22%23s%22%20x%3D%22-60%22%20y%3D%22-60%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%2260%22%20y%3D%22-60%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%22-60%22%20y%3D%2260%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%2260%22%20y%3D%2260%22/%3E%3C/g%3E%3C/svg%3E") 0 0/150px 150px,var(--night)}
+.logo{align-items:center;gap:12px;color:var(--sand)}
+.logo>b{font:700 26px/1 "IBM Plex Sans Arabic",sans-serif}
+.emb{display:inline-block;color:var(--sand);line-height:0}.emb svg{height:100%;width:auto}
+.logo .emb{height:52px}
+.wm{display:inline-grid;grid-template-columns:auto auto;grid-template-areas:"t n" "y y";column-gap:8px;align-items:center;color:var(--sand);line-height:1.05}
+.wm-t{grid-area:t;display:flex;flex-direction:column}
+.wm-t small{font-size:12px;font-weight:400;letter-spacing:.5px;opacity:.85}
+.wm-t b{font-size:17px;font-weight:700}
+.wm-n{grid-area:n;font-size:20px;font-weight:300;padding:0 5px;border-inline:1.5px solid currentColor;border-radius:1px;position:relative;line-height:1.1}
+.wm-y{grid-area:y;font-size:11px;letter-spacing:5px;opacity:.75;text-align:center;margin-top:3px;direction:ltr}
+.wm.big .wm-t small{font-size:17px}.wm.big .wm-t b{font-size:clamp(26px,3.4vw,40px)}.wm.big .wm-n{font-size:clamp(30px,3.6vw,44px);padding:0 9px}.wm.big .wm-y{font-size:15px;letter-spacing:12px;margin-top:8px}
+.who .chip{background:rgba(231,222,210,.1);color:var(--sand)}
+nav.main{border-top:1px solid rgba(231,222,210,.1)}
+nav.main a{color:#d9cfdf}
+.btn.pri{background:var(--plum);border-color:var(--plum)}.btn.pri:hover{background:var(--plum2)}
+.btn.gold{background:var(--sand);border-color:var(--sand);color:var(--night)}.btn.gold:hover{background:#fff}
+.btn.ghost{border-color:rgba(231,222,210,.45);color:var(--sand)}
+/* البطل بنمط الإعلان */
+.hero{background:radial-gradient(55% 120% at 0% 100%,rgba(150,96,64,.35),transparent 70%),radial-gradient(45% 110% at 55% 0%,rgba(98,52,140,.45),transparent 70%),linear-gradient(rgba(31,17,48,.9),rgba(31,17,48,.9)),url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22150%22%20height%3D%22150%22%20viewBox%3D%220%200%20120%20120%22%3E%3Cg%20fill%3D%22%23ffffff%22%3E%3Cg%20id%3D%22s%22%3E%3Crect%20x%3D%2230%22%20y%3D%2230%22%20width%3D%2260%22%20height%3D%2260%22/%3E%3Crect%20x%3D%2230%22%20y%3D%2230%22%20width%3D%2260%22%20height%3D%2260%22%20transform%3D%22rotate%2845%2060%2060%29%22/%3E%3C/g%3E%3Cuse%20href%3D%22%23s%22%20x%3D%22-60%22%20y%3D%22-60%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%2260%22%20y%3D%22-60%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%22-60%22%20y%3D%2260%22/%3E%3Cuse%20href%3D%22%23s%22%20x%3D%2260%22%20y%3D%2260%22/%3E%3C/g%3E%3C/svg%3E") 0 0/180px 180px,var(--night);color:var(--sand)}
+.hero-brand{display:flex;align-items:center;gap:clamp(14px,2.4vw,26px);margin:0 0 18px}
+.hero-brand .emb{height:clamp(110px,14vw,170px)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.lbl,.hero .facts b{color:var(--gold)}
+.hero .facts span{background:rgba(231,222,210,.07);border-color:rgba(231,222,210,.16)}
+.quote{background:rgba(231,222,210,.06);border-color:rgba(231,222,210,.16)}
+.quote blockquote{color:var(--sand)}
+.motto{color:var(--gold)}
+/* النحاسي للعناوين الفرعية والتمييز كما في الإعلان */
+.sec-title{position:relative;padding-bottom:8px;border-bottom:2px solid var(--copper);display:inline-block}
+.cat .yrs,.subhead,.branch .stages{color:var(--copper)}
+.cat b{font-weight:700}
+.card{border-color:var(--line)}
+.tag.plum{background:var(--plum)}
+:focus-visible{outline-color:var(--gold)}
+footer{background:var(--night);color:#cfc4d6}footer b{color:var(--sand)}footer .ig{opacity:.8;font-size:13px}
+#toast{background:var(--night)}
+@media(max-width:640px){.logo .emb{height:44px}.wm-t b{font-size:15px}.wm-n{font-size:17px}.wm-y{display:none}.hero-brand .emb{height:96px}}
+
+/* شاشة الانتظار بالهوية */
+.scr-top .brandline{display:flex;align-items:center;gap:12px}
+.scr-top .emb{height:48px}
+.scr-top .ctx{opacity:.8;font-size:15px}
+.wm-n{border-inline-width:0;background:linear-gradient(currentColor,currentColor) right top/6px 1.5px,linear-gradient(currentColor,currentColor) right bottom/6px 1.5px,linear-gradient(currentColor,currentColor) left top/6px 1.5px,linear-gradient(currentColor,currentColor) left bottom/6px 1.5px,linear-gradient(currentColor,currentColor) right/1.5px 100%,linear-gradient(currentColor,currentColor) left/1.5px 100%;background-repeat:no-repeat;padding:1px 7px}
+.wm.big .wm-n{background-size:10px 2px,10px 2px,10px 2px,10px 2px,2px 100%,2px 100%;padding:2px 12px}
+.scr{background:var(--night)}
+.scr-top{background:rgba(231,222,210,.05);border-bottom:1px solid rgba(231,222,210,.1)}
+.scr-top .wm-t b{font:700 19px/1.05 "IBM Plex Sans Arabic",sans-serif}
+.logo .wm-t b{font:700 17px/1.05 "IBM Plex Sans Arabic",sans-serif}
+@media(max-width:640px){.logo .wm-t b{font-size:15px}}
+.wm-y{direction:ltr;unicode-bidi:isolate;letter-spacing:.9em;padding-inline-start:.9em}
+.wm.big .wm-y{letter-spacing:1.1em;padding-inline-start:1.1em}
+.scr-top .wm,.scr-top .wm b{color:var(--sand)}.scr-top .wm span{opacity:1}.scr-top .wm-t small,.scr-top .wm-y{opacity:.8}
