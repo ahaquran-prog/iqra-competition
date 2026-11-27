@@ -164,8 +164,15 @@ function client(base) {
   for (const l of ['judge.t1', 'judge.t2', 'judge.t3', 'judge.t4', 'judge.t5']) await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid(l), kind: 'judge' });
   await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid('coord.m'), kind: 'coordinator' });
   await mgr.M('POST', '/api/sessions', { stage: 'semi', branch: 'tilawa', startsAt: day(4, 17), endTime: '21:00', location: 'مقر جمعية اقرأ — القاعة الرئيسية' });
+  // بنك مقاطع قبل النهائي للتلاوة (للتجربة فقط)، ومتأهل واحد لم يحضر بعد ليجرّب القرعة
+  const bk = (await adm('GET', '/api/admin/bank?stage=semi')).curricula;
+  const BANK = { 'اليافعون': [[43, 1, 7], [43, 8, 14], [36, 1, 12], [19, 1, 11]], 'الشباب': [[29, 1, 7], [29, 7, 12], [18, 1, 8], [20, 1, 8]], 'الكبار': [[28, 1, 6], [28, 6, 10], [17, 1, 5], [12, 1, 6]] };
+  for (const c of bk) for (const [s, f, t] of BANK[c.category] || []) await adm('POST', '/api/admin/bank', { stage: 'semi', curriculumId: c.id, surah: s, ayahFrom: f, ayahTo: t });
   const rs = await mgr.M('GET', '/api/reception?stage=semi');
-  for (const r of rs.rows) await mgr.M('POST', '/api/checkin', { registrationId: r.id, stage: 'semi', items: r.entries.map((e) => ({ entryId: e.id })) });
+  const keep = rs.rows[0];
+  for (const r of rs.rows.slice(1)) await mgr.M('POST', '/api/checkin', { registrationId: r.id, stage: 'semi', items: r.entries.map((e) => ({ entryId: e.id })) });
+  await mgr.M('POST', '/api/admin/draws/notify', { stage: 'semi' });
+  fs.writeFileSync(outFile.replace(/\.db$/, '.meta.json'), JSON.stringify({ drawAccount: keep ? db.prepare('SELECT p.national_id FROM registrations r JOIN people p ON p.id=r.person_id WHERE r.id=?').get(keep.id).national_id : null }));
   // اختبارات التفسير: أسئلة تجريبية للعرض فقط، وليست بنك الأسئلة المعتمد
   const tl = await adm('GET', '/api/tests');
   const curB = tl.curricula.find((x) => x.kind === 'branch' && x.name.includes('الشباب'));

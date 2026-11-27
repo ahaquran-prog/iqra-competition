@@ -14,6 +14,7 @@ fs.mkdirSync(DIST, { recursive: true });
 execFileSync(process.execPath, [path.join(__dirname, 'seed-demo.js'), path.join(DIST, 'seed.db')], { stdio: 'inherit', cwd: ROOT });
 
 // (2) الحزمة
+const META = JSON.parse(fs.readFileSync(path.join(DIST, 'seed.meta.json'), 'utf8'));
 const esbuild = require('esbuild');
 const shim = (n) => path.join(__dirname, 'shims', n);
 const out = esbuild.buildSync({
@@ -21,7 +22,7 @@ const out = esbuild.buildSync({
   bundle: true, write: false, platform: 'browser', format: 'iife', target: 'es2020', minify: true, charset: 'utf8', legalComments: 'none',
   alias: { 'better-sqlite3': shim('better-sqlite3.js'), express: shim('express.js'), crypto: shim('crypto.js'), fs: shim('fs.js'), path: require.resolve('path-browserify') },
   loader: { '.wasm': 'binary', '.db': 'binary' },
-  define: { __dirname: '"/app"', 'require.main': 'undefined' },
+  define: { __dirname: '"/app"', 'require.main': 'undefined', __DEMO_DRAW__: JSON.stringify(META.drawAccount || '') },
   banner: { js: 'globalThis.process=globalThis.process||{env:{BLOBS_IN_DB:"1",MATERIAL_MAX_MB:"1"},argv:[],platform:"browser"};if(!Number.prototype.unref)Object.defineProperty(Number.prototype,"unref",{value:function(){return this}});' },
   external: ['nodemailer'], // البريد لا يعمل داخل المتصفح
   logLevel: 'warning',

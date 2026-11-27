@@ -19,6 +19,7 @@ function client(base) {
   return async (method, url, body) => {
     const res = await fetch(base + url, { method, headers: { 'X-Iqra': '1', 'Content-Type': 'application/json', Cookie: cookie }, body: body ? JSON.stringify(body) : undefined });
     const sc = res.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0];
+    if (/spreadsheetml/.test(res.headers.get('content-type') || '')) return { status: res.status, data: Buffer.from(await res.arrayBuffer()), headers: res.headers };
     const text = await res.text(); let data; try { data = JSON.parse(text); } catch { data = text; }
     return { status: res.status, data, headers: res.headers };
   };
@@ -124,6 +125,8 @@ function client(base) {
     ok('السجل يحفظ التصحيح بالسبب والقيم السابقة', r.data.history.some((h) => h.action === 'correct' && h.reason && h.before.birthYear === 2022));
     r = await execM('GET', '/api/registrations.csv');
     ok('تصدير CSV ضمن القسم', r.status === 200 && typeof r.data === 'string' && r.data.includes('أحمد') && !r.data.includes('سارة'));
+    r = await execM('GET', '/api/registrations.xlsx');
+    { const xr = require('../lib/xlsx').read(r.data); ok('تصدير المسجلين إلى Excel ضمن القسم، ورقم الهوية نصًا', r.status === 200 && xr[0][1] === 'الاسم الرباعي' && xr.some((x) => x[1].includes('أحمد')) && !xr.some((x) => x[1].includes('سارة')) && /^\d{10}$/.test(xr[1][2]), xr.slice(0, 2)); }
     const bad = await admin('POST', '/api/audit', {});
     ok('سجل التدقيق لا يُكتب من الواجهة', bad.status === 404);
     let threw = false; try { db.prepare('DELETE FROM audit').run(); } catch { threw = true; }
@@ -304,6 +307,8 @@ function client(base) {
     ok('التلاوة: 60 و62 من 65 بوزن 50، والصوت 90 بوزن 50 = 91.92', grp && Math.abs(grp.ranked[0].total - 91.923077) < 1e-5, grp);
     r = await chiefM('GET', '/api/results.csv');
     ok('تصدير كشف الترتيب والدرجات', r.status === 200 && r.data.includes('المجموع (110)') && r.data.includes('91.92'));
+    r = await chiefM('GET', '/api/results.xlsx');
+    { const xr = require('../lib/xlsx').read(r.data).flat(); ok('تصدير الكشف إلى Excel', r.status === 200 && xr.includes('المجموع (110)') && xr.includes('91.92')); }
     r = await jq1('GET', '/api/judge/form/' + nx.data.ticket.id);
     ok('المحكم لا يفتح متسابقًا خارج لجنته', r.status === 404);
 
@@ -378,15 +383,80 @@ function client(base) {
     const qY = sp.find((x) => x.name.includes('تدوير') && x.name.includes('اليافعون'));
     r = await admin('PUT', '/api/admin/stage-passages', { rows: [{ id: qY.id, semi: { surah: 50, ayahFrom: 16, ayahTo: 50 } }] });
     ok('رفض مقطع يتجاوز عدد آيات السورة', r.status === 400);
-    await admin('PUT', '/api/admin/stage-passages', { rows: [{ id: qY.id, semi: { surah: 50, ayahFrom: 16, ayahTo: 22 } }] });
+    // مقطع المجموعة الثابت مختلف عمدًا؛ مقطع القرعة المعتمد يتقدم عليه
+    await admin('PUT', '/api/admin/stage-passages', { rows: [{ id: qY.id, semi: { surah: 50, ayahFrom: 16, ayahTo: 30 } }] });
+
+    console.log('قرعة مقطع التلاوة');
+    const X = require('../lib/xlsx'), e5 = reg5.entries[0].id;
+    const myD = async () => (await c5('GET', '/api/my/draws')).data.rows.find((x) => x.entryId === e5 && x.stage === 'semi');
+    ok('لا قرعة قبل إعلان التأهل', !(await myD()));
+    const xfile = (rows) => ({ name: 'bank.xlsx', data: Buffer.from(X.write([{ name: 'بنك', rows }])).toString('base64') });
+    const HEAD = ['المسار', 'الفئة', 'المرحلة', 'السورة', 'من الآية', 'إلى الآية', 'ملاحظة'];
+    r = await admin('POST', '/api/admin/bank/import', { stage: 'semi', file: xfile([HEAD, ['تدوير', 'اليافعون', 'قبل النهائي', 'سورة ق', 16, 22], ['تدوير', 'اليافعون', '', 'الكهف', 1, 500], ['تدوير', 'المجهولون', '', 'ق', 1, 5]]) });
+    ok('استيراد البنك يرفض الملف كله ويذكر أرقام الصفوف الخاطئة', r.status === 400 && /الصف 3/.test(r.data.error) && /الصف 4/.test(r.data.error) && (await admin('GET', '/api/admin/bank?stage=semi')).data.curricula.every((c) => !c.items.length), r.data);
+    r = await chiefM('POST', '/api/admin/bank/import', { stage: 'semi', file: xfile([HEAD]) });
+    ok('إدارة البنك للإدارة العليا فقط', r.status === 403);
+    r = await admin('POST', '/api/admin/bank/import', { stage: 'semi', file: xfile([HEAD, ['تدوير', 'اليافعون', 'قبل النهائي', 'سورة ق', 16, 22, 'من بداية الربع'], ['تدوير', 'اليافعون', '', '50', '٢٣', '٢٩'], ['تدوير', 'اليافعون', '', 'الكَهْف', 1, 8], ['تدوير', 'اليافعون', '', 'يس', 1, 12], ['ترتيل', 'الشباب', '', 'مريم', 1, 11], ['تدوير', 'اليافعون', 'النهائي', 'طه', 1, 8], ['', '', '', '', '', '']]) });
+    ok('استيراد البنك من Excel: السورة بالاسم أو الرقم والأرقام العربية، وتجاهل صفوف المرحلة الأخرى والفارغة', r.status === 200 && r.data.added === 5, r.data);
+    r = await admin('POST', '/api/admin/bank/import', { stage: 'semi', file: xfile([HEAD, ['تدوير', 'اليافعون', '', 'يس', 1, 12]]) });
+    ok('إعادة الاستيراد لا تكرر مقطعًا موجودًا', r.data.added === 0 && r.data.skipped === 1);
+    let bk = (await admin('GET', '/api/admin/bank?stage=semi')).data.curricula.find((c) => c.name === 'تدوير · اليافعون');
+    ok('بنك المقرر يعرض مقاطعه', bk.items.length === 4 && bk.items.some((i) => i.note === 'من بداية الربع'));
+    r = await admin('POST', '/api/admin/bank', { stage: 'semi', curriculumId: bk.id, surah: 'يس', ayahFrom: 1, ayahTo: 12 });
+    ok('إضافة مقطع مكرر يدويًا مرفوضة', r.status === 400);
+    r = await admin('GET', '/api/admin/bank.xlsx?stage=semi');
+    const bx = X.read(r.data);
+    ok('تنزيل البنك ملف Excel يصلح نموذجًا للاستيراد', r.status === 200 && bx[0][0] === 'المسار' && bx.filter((x) => x[0] === 'تدوير' && x[1] === 'اليافعون').length === 4 && bx.some((x) => x[1] === 'البراعم' || x[1] === 'الشباب'));
+    ok('لا قرعة قبل نشر كشف التأهل', !(await myD()));
+    const tSheet = (await chiefM('GET', '/api/results?branch=tilawa')).data.groups.find((g) => g.key === tg.key).sheet;
+    r = await admin('POST', '/api/results/publish', { sheetId: tSheet.id });
+    await new Promise((ok) => setTimeout(ok, 30));
+    let d5 = await myD();
+    ok('بعد نشر التأهل: القرعة متاحة للمتأهل وإشعار بها', d5 && d5.canDraw && d5.attempts === 0 && (await c5('GET', '/api/notifications')).data.rows.some((n) => n.event === 'draw_open'), d5);
+    ok('إشعار القرعة لا يتكرر', (await execM('POST', '/api/admin/draws/notify', { stage: 'semi' })).data.notified === 0);
+    r = await c5('POST', `/api/my/draws/${e5}/approve`, { stage: 'semi' });
+    ok('لا اعتماد قبل السحب', r.status === 409);
+    r = await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 1 });
+    ok('المحاولة الأولى: مقطع من بنك المقرر', r.status === 200 && r.data.drawn && r.data.state.attempts === 1 && r.data.state.canApprove && r.data.state.canDraw);
+    r = await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 1 });
+    ok('الضغط المزدوج لا يستهلك محاولة', r.data.drawn === false && r.data.state.attempts === 1);
+    r = await ppl.c1.c('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 2 });
+    ok('لا يسحب متسابق لغيره', r.status === 404);
+    r = await execF('POST', `/api/admin/draws/${e5}/draw`, { stage: 'semi', expect: 2 });
+    ok('تنفيذية النساء لا تسحب لمتسابق من الرجال', r.status === 404);
+    await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 2 });
+    r = await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 3 });
+    const labels = r.data.state.draws.map((x) => x.label);
+    ok('المحاولة الثالثة لا خيار بعدها إلا الاعتماد', r.data.state.attempts === 3 && !r.data.state.canDraw && r.data.state.canApprove);
+    ok('لا يتكرر مقطع في سحوبات المتسابق', new Set(labels).size === 3);
+    ok('لا محاولة رابعة', (await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 4 })).status === 409);
+    r = await execM('GET', '/api/admin/draws?stage=semi');
+    ok('الإدارة تتابع القرعة: سحب ولم يعتمد بعد', r.data.rows.find((x) => x.entryId === e5).status === 'pending' && r.data.counts.pending === 1);
+    r = await execM('POST', `/api/admin/draws/${e5}/reset`, { stage: 'semi' });
+    ok('إعادة القرعة تتطلب سببًا', r.status === 400);
+    r = await execM('POST', `/api/admin/draws/${e5}/reset`, { stage: 'semi', reason: 'خطأ في البنك' });
+    ok('إعادة القرعة تمنح ثلاث محاولات جديدة وتُشعر المتسابق', r.status === 200 && r.data.state.attempts === 0 && r.data.state.canDraw);
+    // يبقى في البنك مقطع واحد: ق 16–22
+    bk = (await admin('GET', '/api/admin/bank?stage=semi')).data.curricula.find((c) => c.name === 'تدوير · اليافعون');
+    for (const i of bk.items.filter((i) => !(i.surah === 50 && i.ayahFrom === 16))) await admin('DELETE', '/api/admin/bank/' + i.id);
+    r = await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 1 });
+    ok('إن نفد البنك لا سحب آخر، والاعتماد متاح', r.data.state.current.label.includes('16–22') && !r.data.state.canDraw && r.data.state.canApprove && r.data.state.left === 0);
+    r = await c5('POST', `/api/my/draws/${e5}/approve`, { stage: 'semi' });
+    ok('اعتماد المقطع يقفل القرعة', r.status === 200 && r.data.state.status === 'approved' && !r.data.state.canDraw);
+    ok('المقطع المعتمد يظهر للمتسابق بنص آياته', (await myD()).passage.ayat.length === 7);
+    r = await execM('GET', '/api/admin/draws.xlsx?stage=semi');
+    const dx = X.read(r.data);
+    ok('تنزيل قائمة القرعة ملف Excel', r.status === 200 && dx[1].includes('معتمد') && dx[1].some((c) => /16–22/.test(c)));
+    ok('القرعة في سجل التدقيق', db.prepare("SELECT COUNT(*) n FROM audit WHERE action IN ('draw','reset') AND entity='entry'").get().n >= 5);
     const jv2 = await mkJ('jv2', 'محكم الصوت والنغم الثاني'), jwq = await mkJ('jwq', 'محكم الوقف والابتداء');
     const users2 = (await admin('GET', '/api/users?role=judge')).data.users;
     const semiT = (await execM('GET', '/api/committees?stage=semi')).data.committees.find((k) => k.name.includes('التدوير'));
     for (const l of ['jt1', 'jt2', 'jtv', 'jv2', 'jwq']) await execM('POST', `/api/committees/${semiT.id}/members`, { userId: users2.find((u) => u.login === l).id, kind: 'judge' });
     dbg = await execM('POST', '/api/checkin', { registrationId: reg5.id, stage: 'semi', items: [{ entryId: reg5.entries[0].id }] }); if (dbg.status !== 200) console.log('checkin', dbg.data);
+    ok('تُقفل القرعة بعد تسجيل الحضور', (await execM('POST', `/api/admin/draws/${e5}/reset`, { stage: 'semi', reason: 'x' })).status === 409 && (await myD()).locked);
     qn = await chiefM('POST', `/api/committees/${semiT.id}/next`); await chiefM('POST', `/api/tickets/${qn.data.ticket.id}/action`, { action: 'start' });
     r = await jt1('GET', '/api/judge/form/' + qn.data.ticket.id);
-    ok('قبل النهائي: المصفوفة بمقطع المرحلة (ق 16–22)', r.status === 200 && r.data.passage.from === 16 && r.data.passage.ayat.length === 7);
+    ok('قبل النهائي: المصفوفة بمقطع القرعة المعتمد (ق 16–22) لا بمقطع المجموعة', r.status === 200 && r.data.passage.from === 16 && r.data.passage.ayat.length === 7);
     r = await jwq('GET', '/api/judge/form/' + qn.data.ticket.id);
     ok('محكم الوقف والابتداء يفتح استمارته في قبل النهائي', r.status === 200 && r.data.rubric.key === 'tilawa_waqf');
     await jt1('PUT', '/api/judge/form/' + qn.data.ticket.id, { data: { rows: { 16: { jali_f: 1 }, 18: { majhula: 4 } } }, submit: true });

@@ -323,3 +323,15 @@ tr.pend td{background:#fffaf0}
 .mats li small,.matlist li small{display:block}
 .matlist li>div:first-child{min-width:0;flex:1 1 240px}
 .matlist .acts{margin:0}
+
+/* قرعة المقاطع */
+.mats.draw .acts{margin:8px 0 4px}
+.mats details{margin-top:6px}
+.mats details summary,.bank summary{cursor:pointer;font-weight:600}
+.ayat{font-size:20px;line-height:2.1;padding:10px 4px}
+.ayat .bsm{text-align:center;margin:0 0 6px}
+details.bank{border-bottom:1px solid var(--line);padding:10px 0}
+details.bank summary{display:flex;gap:8px;align-items:center}
+.head.sm{margin:0 0 8px;align-items:center}
+.head.sm h2{margin:0}
+.err{white-space:pre-line}

@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 });
 // رفع المذكرات وحده يقبل طلبًا كبيرًا (الملف بترميز base64)، وبقية الطلبات محدودة
 const bigJson = express.json({ limit: Math.ceil(config.materialMaxMB * 1.4 + 1) + 'mb' }), smallJson = express.json({ limit: '200kb' });
-app.use((req, res, next) => ((req.method === 'POST' || req.method === 'PUT') && /^\/api\/admin\/materials(\/\d+\/file)?$/.test(req.path) ? bigJson : smallJson)(req, res, next));
+app.use((req, res, next) => ((req.method === 'POST' || req.method === 'PUT') && /^\/api\/admin\/(materials(\/\d+\/file)?|bank\/import)$/.test(req.path) ? bigJson : smallJson)(req, res, next));
 app.use((err, req, res, next) => {
   if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'حجم الطلب أكبر من المسموح' });
   if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'صيغة الطلب غير صحيحة' });
@@ -164,24 +164,32 @@ app.get('/api/registrations', need(canSeeRegs), wrap((req) => {
   return { total: rows.length, page, pageSize: PAGE, rows: rows.slice((page - 1) * PAGE, page * PAGE).map((r) => regJson(r, req.user)) };
 }));
 
+// صفوف تصدير المسجلين (CSV وExcel)
+function regRows(req) {
+  const rows = regQuery(req);
+  const out = [['القسم', 'الاسم الرباعي', 'رقم الهوية', 'الهاتف', 'هاتف آخر', 'سنة الميلاد', 'الفئة', 'الفروع والمسارات', 'المقررات', 'حالة الطلب', 'تاريخ التسجيل']];
+  for (const r of rows) {
+    const es = entriesOf(r.id).filter((e) => e.status === 'active');
+    out.push([SECTIONS[r.section], r.full_name, r.national_id, r.phone, r.phone2, r.birth_year, r.category_name,
+      es.map((e) => e.branchName + (e.trackName ? ' — ' + e.trackName : '')).join(' | '), es.map((e) => e.curriculum).join(' | '),
+      REG_ST[r.status], new Date(r.created_at).toISOString().slice(0, 10)]);
+  }
+  audit(req.user, 'export', 'registrations', null, { section: scope(req.user, req.query.section), summary: `تصدير ${rows.length} تسجيلًا` });
+  return out;
+}
 app.get('/api/registrations.csv', need(canManageRegs), (req, res) => {
   try {
-    const rows = regQuery(req);
     // يمنع تفسير نص يبدأ بعلامة مساواة أو صيغة بوصفه معادلة في Excel
     const cell = (v) => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
-    const head = ['القسم', 'الاسم الرباعي', 'رقم الهوية', 'الهاتف', 'هاتف آخر', 'سنة الميلاد', 'الفئة', 'الفروع والمسارات', 'المقررات', 'حالة الطلب', 'تاريخ التسجيل'];
-    const lines = [head.map(cell).join(',')];
-    for (const r of rows) {
-      const es = entriesOf(r.id).filter((e) => e.status === 'active');
-      lines.push([SECTIONS[r.section], r.full_name, r.national_id, r.phone, r.phone2, r.birth_year, r.category_name,
-        es.map((e) => e.branchName + (e.trackName ? ' — ' + e.trackName : '')).join(' | '), es.map((e) => e.curriculum).join(' | '),
-        REG_ST[r.status], new Date(r.created_at).toISOString().slice(0, 10)].map(cell).join(','));
-    }
-    audit(req.user, 'export', 'registrations', null, { section: scope(req.user, req.query.section), summary: `تصدير ${rows.length} تسجيلًا` });
+    const lines = regRows(req).map((r) => r.map(cell).join(','));
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="iqra-registrations-${R.today()}.csv"`);
-    res.send('﻿' + lines.join('\r\n'));
+    res.send('\ufeff' + lines.join('\r\n'));
   } catch (e) { console.error(e); res.status(e instanceof Bad ? e.code : 500).json({ error: e.message || 'حدث خطأ' }); }
+});
+app.get('/api/registrations.xlsx', need(canManageRegs), (req, res) => {
+  try { require('./lib/draws').sendXlsx(res, `iqra-registrations-${R.today()}.xlsx`, [{ name: 'المسجلون', rows: regRows(req).map((r) => r.map((v, i) => (i === 2 || i === 3 || i === 4 ? String(v ?? '') : v))) }]); }
+  catch (e) { console.error(e); res.status(e instanceof Bad ? e.code : 500).json({ error: e.message || 'حدث خطأ' }); }
 });
 
 app.get('/api/registrations/:id', need(canSeeRegs), wrap((req) => {
@@ -565,6 +573,7 @@ require('./lib/judging')(app);
 // اختبار التفسير الإلكتروني
 require('./lib/tests')(app);
 require('./lib/materials').routes(app);
+require('./lib/draws').routes(app);
 // الإشعارات ومواعيد المراحل
 const N = require('./lib/notify');
 N.routes(app);
