@@ -59,7 +59,7 @@ function route() {
   const allowed = navFor().map((x) => x[0]).concat(me && me.role !== 'screen' ? ['inbox'] : []);
   view = allowed.includes(h) ? h : homeOf();
   stopPoll(); document.body.classList.toggle('screen-mode', view === 'screen');
-  if (view === 'screen') { SCR.first = true; SCR.last = 0; }
+  if (view === 'screen') { SCR.first = true; SCR.last = 0; fitScreen(); }
   if (view !== 'grade') S.fm = null;
   if (view !== 'tests') { S.exam = null; S.testId = null; clearInterval(EX.tick); }
   render(); scrollTo(0, 0);
@@ -614,14 +614,19 @@ async function vScreen() {
   if (fresh.length) announce(fresh);
   startPoll(2000, repaint);
   const top = d.calls[0];
-  return `<div class="scr"><header class="scr-top"><div class="brandline"><span class="emb">${LOGO}</span>${wordmark(pub && pub.competition)}<span class="ctx">${esc(d.stageName)} · ${esc(d.sectionName)}</span></div>
+  const nk = d.committees.length, kc = nk <= 3 ? 'k3' : nk <= 6 ? 'k6' : nk <= 8 ? 'k8' : nk <= 12 ? 'k12' : 'k16';
+  const ln = top ? (top.name.length > 34 ? ' long2' : top.name.length > 24 ? ' long' : '') : '';
+  return `<div class="scr-wrap"><div class="scr"><header class="scr-top"><div class="brandline"><span class="emb">${LOGO}</span>${wordmark(pub && pub.competition)}<span class="ctx">${esc(d.stageName)} · ${esc(d.sectionName)}</span></div>
     <div class="acts"><span class="clock">${new Date().toLocaleTimeString('ar-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}</span>
     ${me.role === 'top' ? `<button class="btn sm ghost" data-act="ssec">${SCR.section === 'M' ? 'عرض قسم النساء' : 'عرض قسم الرجال'}</button>` : ''}
     <select class="scr-stage" id="scr-stage" aria-label="المرحلة">${opts(STG, S.stage)}</select><button class="btn sm ${SCR.sound ? 'gold' : 'ghost'}" data-act="sound">${SCR.sound ? 'الصوت مفعّل' : 'تفعيل الصوت'}</button><button class="btn sm ghost" data-act="fs">ملء الشاشة</button>${me.role !== 'screen' ? `<a class="btn sm ghost" href="#${homeOf()}">خروج من الشاشة</a>` : ''}</div></header>
-  <section class="scr-now ${top && top.fresh ? 'flash' : ''}">${top ? `<p class="lbl">${top.kind === 'recall' ? 'نداء متكرر' : 'النداء الحالي'}</p><h1>${esc(top.name)}</h1><p class="to">يتوجه إلى <b>${esc(top.committee)}</b>${top.hall ? ` · <b>${esc(top.hall)}</b>` : ''}</p>` : '<p class="lbl">قاعة الانتظار</p><h1>أهلًا بكم</h1><p class="to">ستظهر هنا أسماء المتسابقين عند نداء لجانهم</p>'}</section>
-  <div class="scr-body"><div class="scr-grid">${d.committees.map((k) => `<div class="scr-c ${k.current ? 's-' + k.current.status : ''}"><span class="scr-h">${esc(k.name)}<small>${esc(k.hall)}</small></span><b>${k.current ? esc(k.current.name) : '—'}</b><span class="scr-st">${k.current ? esc(k.current.statusName) : 'بانتظار النداء'} · منتظر ${k.waiting}</span></div>`).join('')}</div>
-  <aside class="scr-log"><h2>آخر النداءات</h2><ol>${d.calls.slice(0, 8).map((c) => `<li><b>${esc(c.name)}</b><span>${esc(c.committee)}${c.hall ? ' · ' + esc(c.hall) : ''}</span></li>`).join('') || '<li>لا نداءات بعد</li>'}</ol></aside></div></div>`;
+  <section class="scr-now${ln} ${top && top.fresh ? 'flash' : ''}">${top ? `<p class="lbl">${top.kind === 'recall' ? 'نداء متكرر' : 'النداء الحالي'}</p><h1>${esc(top.name)}</h1><p class="to">يتوجه إلى <b>${esc(top.committee)}</b>${top.hall ? ` · <b>${esc(top.hall)}</b>` : ''}</p>` : '<p class="lbl">قاعة الانتظار</p><h1>أهلًا بكم</h1><p class="to">ستظهر هنا أسماء المتسابقين عند نداء لجانهم</p>'}</section>
+  <div class="scr-body"><div class="scr-grid ${kc}">${d.committees.map((k) => `<div class="scr-c ${k.current ? 's-' + k.current.status : ''}"><span class="scr-h">${esc(k.name)}<small>${esc(k.hall)}</small></span><b>${k.current ? esc(k.current.name) : '—'}</b><span class="scr-st">${k.current ? esc(k.current.statusName) : 'بانتظار النداء'} · منتظر ${k.waiting}</span></div>`).join('')}</div>
+  <aside class="scr-log"><h2>آخر النداءات</h2><ol>${d.calls.slice(0, 5).map((c) => `<li><b>${esc(c.name)}</b><span>${esc(c.committee)}${c.hall ? ' · ' + esc(c.hall) : ''}</span></li>`).join('') || '<li>لا نداءات بعد</li>'}</ol></aside></div></div></div>`;
 }
+// شاشة العرض لوحة ثابتة 16:9 (1920×1080) تُكبَّر أو تُصغَّر لتملأ النافذة كاملة دون تمرير
+function fitScreen() { document.documentElement.style.setProperty('--scr-s', String(Math.min(window.innerWidth / 1920, window.innerHeight / 1080))); }
+window.addEventListener('resize', fitScreen); document.addEventListener('fullscreenchange', () => setTimeout(fitScreen, 60));
 function chime() { try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.setValueAtTime(0.2, a.currentTime); g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.9); o.start(); o.stop(a.currentTime + 0.9); } catch (e) {} }
 function announce(list) {
   if (!SCR.sound) return;
