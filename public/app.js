@@ -21,7 +21,7 @@ async function api(path, opt = {}) {
   let data = {};
   try { data = await res.json(); } catch (e) {}
   if (res.status === 401 && !['/login', '/me'].includes(path)) { me = null; go('login'); throw new Error(data.error || 'انتهت الجلسة، سجّل الدخول مجددًا'); }
-  if (res.status === 403 && data.mustChange) { me.mustChange = true; render(); throw new Error(data.error); }
+  if (res.status === 403 && data.mustChange) { if (me && !me.mustChange) { me.mustChange = true; render(); } throw new Error(data.error); }
   if (!res.ok) throw new Error(data.error || 'حدث خطأ');
   return data;
 }
@@ -80,7 +80,7 @@ function shell() {
 }
 // عدد الإشعارات غير المقروءة، كل 30 ثانية
 S.unread = 0;
-async function pollUnread() { if (!me || me.role === 'screen' || document.hidden) return; try { const n = (await api('/notifications/unread')).unread; if (n !== S.unread) { S.unread = n; shell(); } } catch (e) {} }
+async function pollUnread() { if (!me || me.mustChange || me.role === 'screen' || document.hidden) return; try { const n = (await api('/notifications/unread')).unread; if (n !== S.unread) { S.unread = n; shell(); } } catch (e) {} }
 setInterval(pollUnread, 30000);
 // تحديث دوري للطوابير والشاشة ومتابعة المتسابق
 let pollT = null;

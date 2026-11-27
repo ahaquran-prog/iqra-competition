@@ -34,8 +34,12 @@ function client(base) {
     ok('دخول الإدارة العليا', r.status === 200 && r.data.user.role === 'top');
     r = await admin('GET', '/api/registrations');
     ok('إلزام تغيير كلمة المرور المؤقتة', r.status === 403 && r.data.mustChange);
+    const admin2 = client(base); await admin2('POST', '/api/login', { login: 'admin', password: 'Admin-12345' });
     r = await admin('POST', '/api/password', { current: 'Admin-12345', next: 'NewAdmin-2026' });
     ok('تغيير كلمة المرور', r.status === 200);
+    r = await admin('GET', '/api/me');
+    ok('تغيير كلمة المرور لا يُخرج صاحبها: جلسته الحالية باقية', r.status === 200 && r.data.user.mustChange === false);
+    ok('وتنتهي جلساته على الأجهزة الأخرى', (await admin2('GET', '/api/me')).status === 401);
     const csrf = await fetch(base + '/api/logout', { method: 'POST' });
     ok('رفض الطلب دون ترويسة الحماية', csrf.status === 403);
 

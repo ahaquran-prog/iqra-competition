@@ -107,8 +107,8 @@ app.post('/api/password', wrap((req, res) => {
   const p = auth.passwordProblem(np); if (p) throw new Bad(p);
   if (np === current) throw new Bad('اختر كلمة مرور مختلفة عن الحالية');
   db.prepare('UPDATE users SET pass_hash=?, must_change=0 WHERE id=?').run(auth.hashPassword(np), req.user.id);
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.user.id);
-  auth.createSession(res, req.user.id);
+  // تُنهى جلسات الحساب على الأجهزة الأخرى، وتبقى الجلسة الحالية فلا يخرج صاحبها (ولا تفشل طلباته الجارية)
+  db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').run(req.user.id, auth.currentToken(req));
   return { ok: true };
 }));
 
