@@ -917,20 +917,20 @@ async function vDays() {
   S.dpeople = S.dpeople && S.dpeople.section === sec ? S.dpeople : { section: sec, day: '', rows: null };
   if (S.dpeople.day !== '' && !S.dpeople.rows) S.dpeople.rows = (await api(`/days/people?section=${sec}&day=${S.dpeople.day}`)).rows;
   const dayOpts = [...d.days.map((x) => [x.id, `${x.name} · ${x.label}`]), ['none', 'غير موزّعين']];
-  return `<div class="head"><div><h1>توزيع المتسابقين على أيام التصفيات</h1><p>حدد أيام التصفيات الأولية وسعة كل يوم لكل فرع وفئة، ثم اطلب التوزيع وراجعه، ثم اعتمده وانشره فيصل كل متسابق يومه. يُجمع صاحب أكثر من مشاركة في يوم واحد ما أمكن.</p></div>
+  return `<div class="head"><div><h1>توزيع المتسابقين على أيام التصفيات</h1><p>حدد أيام التصفيات الأولية وسعة كل يوم لكل مقرر (فئات الحفظ، و5 و10 أجزاء، والقرآن كاملًا، والترتيل والتدوير لكل فئة)، ثم اطلب التوزيع وراجعه، ثم اعتمده وانشره فيصل كل متسابق يومه. يُجمع صاحب أكثر من مشاركة في يوم واحد ما أمكن.</p></div>
     ${me.role === 'top' ? `<div class="acts">${['M', 'F'].map((x) => `<button class="btn ${x === sec ? 'pri' : ''}" data-act="daysec" data-s="${x}">${esc(meta.sections[x])}</button>`).join('')}</div>` : ''}</div>
   <div class="banner ${st[0] === 'ok' ? 'info' : 'warn'}"><b>${esc(st[1])}</b>${d.publishedAt ? ` · آخر نشر ${esc(fmt(d.publishedAt))}` : ''}${d.regClose ? ` · إغلاق التسجيل ${esc(d.regClose)}` : ''}</div>
   <div class="kpis"><div class="kpi main"><b>${d.persons}</b><span>متسابقًا في الفروع الميدانية</span></div><div class="kpi"><b>${d.entries}</b><span>مشاركة</span></div><div class="kpi"><b>${d.unassigned}</b><span>غير موزّعة</span></div><div class="kpi"><b>${d.checkedIn}</b><span>حضرت</span></div></div>
   <div class="card"><h2>الأيام والسعة</h2><form data-form="dplan"><p class="err" hidden></p>
     <div class="row3"><div class="field"><label for="dp-n">عدد أيام التصفيات</label><input id="dp-n" type="number" min="1" max="14" value="${P.n}" data-dn></div>
     ${dayIx.map((no) => `<div class="field"><label for="dp-d${no}">${esc(['اليوم الأول', 'اليوم الثاني', 'اليوم الثالث', 'اليوم الرابع', 'اليوم الخامس', 'اليوم السادس', 'اليوم السابع'][no - 1] || 'اليوم ' + no)}</label><input id="dp-d${no}" type="date" value="${esc(P.dates[no - 1] || '')}" data-dd="${no}" required></div>`).join('')}</div>
-    <div class="scroll"><table class="list caps"><thead><tr><th>الفرع والفئة</th><th>المسجلون</th>${dayIx.map((no) => `<th>يوم ${no}</th>`).join('')}<th>مجموع السعة</th></tr></thead><tbody>
-    ${d.groups.map((g) => { const tot = dayIx.reduce((n, no) => n + capOf(no, g.key), 0); return `<tr><td><b>${esc(g.branchName)}</b> · ${esc(g.categoryName)}</td><td class="n">${g.registered}</td>
-      ${dayIx.map((no) => `<td><input class="capin" type="number" min="0" max="5000" inputmode="numeric" value="${capOf(no, g.key) || ''}" placeholder="0" data-cap="${no}|${g.key}" aria-label="${esc(g.branchName + ' ' + g.categoryName)} يوم ${no}"></td>`).join('')}
+    <div class="scroll"><table class="list caps"><thead><tr><th>المقرر (الفرع والمسار والفئة)</th><th>المسجلون</th>${dayIx.map((no) => `<th>يوم ${no}</th>`).join('')}<th>مجموع السعة</th></tr></thead><tbody>
+    ${d.groups.map((g) => { const tot = dayIx.reduce((n, no) => n + capOf(no, g.key), 0); return `<tr><td><b>${esc(g.label)}</b></td><td class="n">${g.registered}</td>
+      ${dayIx.map((no) => `<td><input class="capin" type="number" min="0" max="5000" inputmode="numeric" value="${capOf(no, g.key) || ''}" placeholder="0" data-cap="${no}|${g.key}" aria-label="${esc(g.label)} يوم ${no}"></td>`).join('')}
       <td class="n" data-ctot="${esc(g.key)}">${capCell(tot, g.registered)}</td></tr>`; }).join('')}
     <tr class="sum"><td>المجموع</td><td class="n">${d.groups.reduce((n, g) => n + g.registered, 0)}</td>${dayIx.map((no) => `<td class="n" data-dtot="${no}"><b>${d.groups.reduce((n, g) => n + capOf(no, g.key), 0)}</b></td>`).join('')}<td></td></tr></tbody></table></div>
     <div class="acts"><button class="btn" type="button" data-act="dp-even">اقتراح سعة بالتساوي</button><button class="btn pri" type="submit">حفظ الأيام والسعة</button></div>
-    <p class="note">السعة عدد المشاركات في اليوم لكل فرع وفئة. «اقتراح بالتساوي» يقسم المسجلين على الأيام، ويمكنك تعديله قبل الحفظ.</p></form></div>
+    <p class="note">السعة عدد المتسابقين في اليوم لكل مقرر. المقرر الذي لا سعة له لا يُوزَّع أحد منه. «اقتراح بالتساوي» يقسم المسجلين على الأيام، ويمكنك تعديله قبل الحفظ.</p></form></div>
   <div class="card"><div class="head sm"><h2>التوزيع</h2><div class="acts"><button class="btn" data-act="xl" data-href="/api/days.xlsx?section=${sec}" data-n="توزيع أيام التصفيات.xlsx">تنزيل التوزيع (Excel)</button></div></div>
     ${d.days.length ? `<div class="row3"><div class="field"><label for="dp-o">ترتيب التوزيع</label><select id="dp-o">${opts([['registration', 'بأسبقية التسجيل (الأسبق في الأيام الأولى)'], ['random', 'عشوائي'], ['name', 'أبجدي بالاسم']], S.dorder || 'registration')}</select></div></div>
     <div class="acts"><button class="btn pri" data-act="dp-run" data-m="all">${d.days.some((x) => x.entries) ? 'إعادة توزيع الجميع' : 'توزيع المتسابقين'}</button>${d.days.some((x) => x.entries) ? '<button class="btn" data-act="dp-run" data-m="fill">توزيع غير الموزعين فقط</button>' : ''}
@@ -1264,7 +1264,7 @@ document.addEventListener('submit', async (e) => {
     else if (k === 'dplan') {
       const P = S.dplan, days = Array.from({ length: P.n }, (_, i) => ({ date: P.dates[i] || '' }));
       if (days.some((x) => !x.date)) throw new Error('أدخل تاريخ كل يوم');
-      const caps = []; for (const g of S.dd.groups) for (let i = 1; i <= P.n; i++) { const v = P.caps[`${i}|${g.key}`] || 0; if (v) caps.push({ dayNo: i, branch: g.branch, categoryId: g.categoryId, cap: v }); }
+      const caps = []; for (const g of S.dd.groups) for (let i = 1; i <= P.n; i++) { const v = P.caps[`${i}|${g.key}`] || 0; if (v) caps.push({ dayNo: i, curriculumId: g.curriculumId, cap: v }); }
       await api('/days', { method: 'PUT', body: { section: S.dd.section, days, caps } }); S.dplanDirty = false; toast('حُفظت الأيام والسعة'); render();
     }
     else if (k === 'bank-add') { await api('/admin/bank', { method: 'POST', body: { stage: S.dst, curriculumId: val('bk-c'), surah: val('bk-s'), ayahFrom: val('bk-f'), ayahTo: val('bk-t'), note: val('bk-n') } }); toast('أُضيف المقطع إلى البنك'); const keep = val('bk-c'); await render(); const sel = document.getElementById('bk-c'); if (sel) sel.value = keep; }

@@ -165,15 +165,16 @@ function client(base) {
 
     console.log('توزيع المتسابقين على أيام التصفيات');
     r = await execM('GET', '/api/days');
-    const gH = r.data.groups.find((g) => g.branch === 'hifz' && g.categoryName === 'اليافعون'), gT = r.data.groups.find((g) => g.branch === 'tilawa' && g.categoryName === 'اليافعون');
-    ok('التوزيع: مجموعات الفروع الميدانية والفئات بعدد المسجلين (دون التفسير)', gH.registered === 4 && gT.registered === 2 && !r.data.groups.some((g) => g.branch === 'tafsir') && r.data.unassigned === 6, r.data.groups.map((g) => g.key + '=' + g.registered));
+    const gH = r.data.groups.find((g) => g.label === 'الحفظ · اليافعون'), gT = r.data.groups.find((g) => g.label === 'التلاوة · ترتيل · اليافعون'), gJ = r.data.groups.find((g) => g.label === 'الحفظ · حفظ خمسة أجزاء');
+    ok('التوزيع: مجموعة لكل مقرر — فئات الحفظ و5 و10 أجزاء والقرآن كاملًا، والترتيل والتدوير لكل فئة (دون التفسير)', r.data.groups.length === 14 && gH.registered === 4 && gJ.registered === 0 && gT.registered === 2
+      && r.data.groups.some((g) => g.label === 'الحفظ · كامل القرآن') && r.data.groups.some((g) => g.label === 'التلاوة · تدوير · الكبار') && !r.data.groups.some((g) => g.branch === 'tafsir') && r.data.unassigned === 6, r.data.groups.map((g) => g.label + '=' + g.registered));
     { const f = (await execF('GET', '/api/days')).data; ok('التوزيع لقسم التنفيذية فقط', f.section === 'F' && f.entries === 1 && (await execM('GET', '/api/days?section=F')).data.section === 'M', f.entries); }
     const capsBody = (d1h, d1t, d2h, d2t) => ({ days: [{ date: '2026-12-03' }, { date: '2026-12-04' }], caps: [
-      { dayNo: 1, branch: 'hifz', categoryId: gH.categoryId, cap: d1h }, { dayNo: 1, branch: 'tilawa', categoryId: gT.categoryId, cap: d1t },
-      { dayNo: 2, branch: 'hifz', categoryId: gH.categoryId, cap: d2h }, { dayNo: 2, branch: 'tilawa', categoryId: gT.categoryId, cap: d2t }] });
+      { dayNo: 1, curriculumId: gH.curriculumId, cap: d1h }, { dayNo: 1, curriculumId: gT.curriculumId, cap: d1t },
+      { dayNo: 2, curriculumId: gH.curriculumId, cap: d2h }, { dayNo: 2, curriculumId: gT.curriculumId, cap: d2t }] });
     ok('رفض تاريخين متكررين', (await execM('PUT', '/api/days', { days: [{ date: '2026-12-03' }, { date: '2026-12-03' }] })).status === 400);
     r = await execM('PUT', '/api/days', capsBody(2, 1, 1, 1));
-    ok('حفظ الأيام والسعة لكل فرع وفئة', r.status === 200 && r.data.days.length === 2 && r.data.days[0].cap === 3 && r.data.days[0].label.includes('3 ديسمبر'), r.data);
+    ok('حفظ الأيام والسعة لكل مقرر', r.status === 200 && r.data.days.length === 2 && r.data.days[0].cap === 3 && r.data.days[0].label.includes('3 ديسمبر'), r.data);
     r = await execM('POST', '/api/days/distribute', { mode: 'all', order: 'registration' });
     ok('التوزيع يحترم السعة ويذكر من لم تتسع له', r.status === 200 && r.data.result.assigned === 5 && r.data.result.unassigned === 1, r.data.result);
     const dayOf = (k) => db.prepare('SELECT d.day_no n FROM day_assign a JOIN prelim_days d ON d.id=a.day_id WHERE a.entry_id=?').all(ppl[k].reg.entries[0].id).map((x) => x.n)[0];
