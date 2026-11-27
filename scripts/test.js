@@ -157,6 +157,46 @@ function client(base) {
     ok('تنفيذية النساء ترى لجان قسمها فقط', r.data.committees.length === 6 && r.data.committees.every((x) => x.section === 'F'));
     r = await execM('GET', '/api/reception?q=' + encodeURIComponent('ياسر'));
     ok('ATT01: البحث يجد الاسم أيًّا كان موضعه الأبجدي', r.data.total === 1 && r.data.rows[0].entries[0].candidates.length === 1);
+
+    console.log('توزيع المتسابقين على أيام التصفيات');
+    r = await execM('GET', '/api/days');
+    const gH = r.data.groups.find((g) => g.branch === 'hifz' && g.categoryName === 'اليافعون'), gT = r.data.groups.find((g) => g.branch === 'tilawa' && g.categoryName === 'اليافعون');
+    ok('التوزيع: مجموعات الفروع الميدانية والفئات بعدد المسجلين (دون التفسير)', gH.registered === 4 && gT.registered === 2 && !r.data.groups.some((g) => g.branch === 'tafsir') && r.data.unassigned === 6, r.data.groups.map((g) => g.key + '=' + g.registered));
+    { const f = (await execF('GET', '/api/days')).data; ok('التوزيع لقسم التنفيذية فقط', f.section === 'F' && f.entries === 1 && (await execM('GET', '/api/days?section=F')).data.section === 'M', f.entries); }
+    const capsBody = (d1h, d1t, d2h, d2t) => ({ days: [{ date: '2026-12-03' }, { date: '2026-12-04' }], caps: [
+      { dayNo: 1, branch: 'hifz', categoryId: gH.categoryId, cap: d1h }, { dayNo: 1, branch: 'tilawa', categoryId: gT.categoryId, cap: d1t },
+      { dayNo: 2, branch: 'hifz', categoryId: gH.categoryId, cap: d2h }, { dayNo: 2, branch: 'tilawa', categoryId: gT.categoryId, cap: d2t }] });
+    ok('رفض تاريخين متكررين', (await execM('PUT', '/api/days', { days: [{ date: '2026-12-03' }, { date: '2026-12-03' }] })).status === 400);
+    r = await execM('PUT', '/api/days', capsBody(2, 1, 1, 1));
+    ok('حفظ الأيام والسعة لكل فرع وفئة', r.status === 200 && r.data.days.length === 2 && r.data.days[0].cap === 3 && r.data.days[0].label.includes('3 ديسمبر'), r.data);
+    r = await execM('POST', '/api/days/distribute', { mode: 'all', order: 'registration' });
+    ok('التوزيع يحترم السعة ويذكر من لم تتسع له', r.status === 200 && r.data.result.assigned === 5 && r.data.result.unassigned === 1, r.data.result);
+    const dayOf = (k) => db.prepare('SELECT d.day_no n FROM day_assign a JOIN prelim_days d ON d.id=a.day_id WHERE a.entry_id=?').all(ppl[k].reg.entries[0].id).map((x) => x.n)[0];
+    const c1d = db.prepare('SELECT DISTINCT d.day_no n FROM day_assign a JOIN prelim_days d ON d.id=a.day_id WHERE a.entry_id IN (?,?)').all(ppl.c1.reg.entries[0].id, ppl.c1.reg.entries[1].id);
+    ok('صاحب المشاركتين يُجمع في يوم واحد', c1d.length === 1 && c1d[0].n === 1);
+    ok('بأسبقية التسجيل: الأسبق في اليوم الأول ومن زاد عن السعة غير موزّع', dayOf('c2') === 2 && dayOf('c3') === 2 && dayOf('c4') === undefined, [dayOf('c2'), dayOf('c3'), dayOf('c4')]);
+    ok('لا يرى المتسابق يومه قبل النشر', (await ppl.c1.c('GET', '/api/my/day')).data.days.length === 0);
+    r = await execM('POST', '/api/days/publish', {});
+    ok('اعتماد التوزيع ونشره يُشعر الموزعين', r.status === 200 && r.data.notified === 4 && r.data.published && !r.data.changed, r.data.notified);
+    r = await ppl.c1.c('GET', '/api/my/day');
+    ok('المتسابق يرى يومه وتاريخه وفروعه', r.data.days.length === 1 && r.data.days[0].name === 'اليوم الأول' && r.data.days[0].branches.length === 2);
+    ok('إشعار يوم الحضور', (await ppl.c1.c('GET', '/api/notifications')).data.rows.some((n) => n.event === 'prelim_day' && n.title === 'يوم حضورك للتصفيات الأولية'));
+    ok('إعادة النشر دون تغيير لا تكرر الإشعار', (await execM('POST', '/api/days/publish', {})).data.notified === 0);
+    r = await execM('POST', '/api/days/move', { registrationId: ppl.c4.reg.id, dayId: (await execM('GET', '/api/days')).data.days[1].id });
+    ok('نقل متسابق يدويًا (ولو تجاوز السعة) ويُعلَّم التوزيع بأنه تغيّر', r.status === 200 && dayOf('c4') === 2 && (await execM('GET', '/api/days')).data.changed);
+    r = await execM('POST', '/api/days/distribute', { mode: 'fill' });
+    ok('توزيع غير الموزعين يُبقي التوزيع القائم', r.data.result.assigned === 0 && dayOf('c2') === 2 && dayOf('c4') === 2);
+    r = await execM('POST', '/api/days/move', { registrationId: ppl.c2.reg.id, dayId: (await execM('GET', '/api/days')).data.days[0].id });
+    r = await execM('POST', '/api/days/publish', {});
+    ok('بعد النقل: يُشعر من تغيّر يومه ومن أُضيف فقط', r.data.notified === 2, r.data.notified);
+    ok('إشعار التغيير بعنوان واضح', (await ppl.c2.c('GET', '/api/notifications')).data.rows.some((n) => n.title === 'تغيّر يوم حضورك للتصفيات الأولية'));
+    r = await execM('GET', '/api/reception?q=' + encodeURIComponent('بلال'));
+    ok('الاستقبال يعرض يوم المتسابق', r.data.rows[0].entries[0].day && r.data.rows[0].entries[0].day.name === 'اليوم الأول');
+    r = await execM('GET', '/api/days/people?day=' + (await execM('GET', '/api/days')).data.days[0].id);
+    ok('قائمة اليوم', r.data.rows.some((p) => p.name.startsWith('بلال')) && r.data.rows.some((p) => p.name.startsWith('زياد')));
+    r = await execM('GET', '/api/days.xlsx');
+    { const xr = require('../lib/xlsx').read(r.data); ok('تنزيل التوزيع Excel (ورقة لكل يوم)', r.status === 200 && xr[0][2] === 'الاسم' && xr.length >= 3); }
+    ok('المحكم لا يدخل التوزيع', (await judgeM('GET', '/api/days')).status === 403);
     const ci = (k, idx) => execM('POST', '/api/checkin', { registrationId: ppl[k].reg.id, items: idx.map((i) => ({ entryId: ppl[k].reg.entries[i].id })) });
     const a1 = await ci('c1', [0, 1]), a1b = await ci('c1', [0, 1]);
     ok('ATT03: تثبيت الحضور مرتين يعطي التذكرة ورقم الوصول نفسيهما', a1.status === 200 && a1b.data.tickets[0].id === a1.data.tickets[0].id && a1b.data.tickets[0].seq === a1.data.tickets[0].seq);
@@ -625,8 +665,14 @@ function client(base) {
     ok('موعد الحفظ لا يُرسل لمن ليس في الحفظ', !nn.rows.some((x) => x.event === 'session'));
     r = await ppl.c2.c('GET', '/api/my/schedule');
     ok('مواعيدي: موعد مرحلة المشاركة وموقعها', r.data.rows.some((x) => x.session && x.session.location.includes('القاعة الكبرى')));
+    // التوزيع منشور لقسم الرجال: يُذكَّر كل متسابق قبل يومه، لا قبل اليوم الأول للجميع
+    const sess = db.prepare('SELECT starts_at FROM stage_sessions WHERE id=?').get(sid).starts_at;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: CFG.timeZone }).format(new Date(sess));
+    db.prepare("UPDATE prelim_days SET date=? WHERE section='M' AND day_no=1").run(today);
+    db.prepare("UPDATE prelim_days SET date=? WHERE section='M' AND day_no=2").run(new Date(Date.parse(today + 'T12:00:00Z') + 864e5).toISOString().slice(0, 10));
     const rm1 = NT.runReminders(), rm2 = NT.runReminders();
-    ok('التذكير قبل الموعد يُرسل مرة واحدة', rm1 > 0 && rm2 === 0);
+    ok('التذكير قبل الموعد يُرسل مرة واحدة', rm1 > 0 && rm2 === 0, [rm1, rm2]);
+    ok('بعد نشر توزيع الأيام: التذكير لأصحاب اليوم القريب فقط', (await notes(ppl.c1.c)).rows.some((x) => x.event === 'reminder' && x.title.includes('يوم حضورك')) && !(await notes(ppl.c3.c)).rows.some((x) => x.event === 'reminder'));
     await NT.processQueue(); await new Promise((ok2) => setTimeout(ok2, 50));
     ok('الإرسال عبر مزود الرسائل برقم دولي ومفتاح', got.length > 0 && got.every((g) => g.to.startsWith('+973') && g.auth === 'Bearer tkn'));
     r = await admin('GET', '/api/admin/notifications');

@@ -575,6 +575,7 @@ require('./lib/judging')(app);
 require('./lib/tests')(app);
 require('./lib/materials').routes(app);
 require('./lib/draws').routes(app);
+require('./lib/days').routes(app);
 // الإشعارات ومواعيد المراحل
 const N = require('./lib/notify');
 N.routes(app);

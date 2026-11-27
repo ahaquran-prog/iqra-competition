@@ -430,3 +430,8 @@ footer{background:var(--night);color:#cfc4d6}footer b{color:var(--sand)}footer .
 .scr-log li{font-size:24px;padding:11px 0;border-color:rgba(231,222,210,.14)}.scr-log li span{font-size:19px}
 .scr-log li b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:900px){.scr-body{grid-template-columns:minmax(0,1fr) 460px}}
+
+/* توزيع الأيام */
+table.caps .capin{width:84px;min-height:36px;padding:4px 8px;text-align:center}
+table.caps tr.sum td{border-top:2px solid var(--line);font-weight:700}
+.ent .day{display:inline-block;margin-inline-start:6px}

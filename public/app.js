@@ -46,8 +46,8 @@ const NAV = {
   judge: [['grade', 'الرصد'], ['queues', 'طابور لجنتي'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   coordinator: [['queues', 'النداء'], ['space', 'مساحتي'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   chief: [['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['tests', 'اختبارات التفسير'], ['committees', 'اللجان'], ['regs', 'المسجلون (اطلاع)'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  exec: [['dash', 'لوحة القسم'], ['schedule', 'المواعيد'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'المسجلون'], ['tests', 'اختبارات التفسير'], ['draws', 'قرعة المقاطع'], ['materials', 'المذكرات'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
-  top: [['dash', 'لوحة المتابعة'], ['regs', 'المسجلون'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['tests', 'اختبارات التفسير'], ['draws', 'قرعة المقاطع'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['schedule', 'المواعيد'], ['materials', 'المذكرات'], ['notices', 'الإشعارات'], ['setup', 'إعداد الدورة'], ['users', 'حسابات الكادر'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  exec: [['dash', 'لوحة القسم'], ['schedule', 'المواعيد'], ['days', 'توزيع الأيام'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['committees', 'اللجان'], ['regs', 'المسجلون'], ['tests', 'اختبارات التفسير'], ['draws', 'قرعة المقاطع'], ['materials', 'المذكرات'], ['screen', 'شاشة الانتظار'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
+  top: [['dash', 'لوحة المتابعة'], ['regs', 'المسجلون'], ['reception', 'الاستقبال والحضور'], ['queues', 'الطوابير والنداء'], ['results', 'النتائج'], ['tests', 'اختبارات التفسير'], ['draws', 'قرعة المقاطع'], ['committees', 'اللجان'], ['screen', 'شاشة الانتظار'], ['schedule', 'المواعيد'], ['days', 'توزيع الأيام'], ['materials', 'المذكرات'], ['notices', 'الإشعارات'], ['setup', 'إعداد الدورة'], ['users', 'حسابات الكادر'], ['audit', 'سجل التدقيق'], ['home', 'تعريف المسابقة'], ['account', 'حسابي']],
   screen: [['screen', 'شاشة الانتظار']],
 };
 const navFor = () => NAV[me ? me.role : 'public'];
@@ -197,6 +197,7 @@ async function vMy() {
   S.mySch = S.my.registration ? (await api('/my/schedule')).rows : [];
   S.myM = S.my.registration ? (await api('/my/materials')).rows : [];
   S.myD = S.my.registration ? (await api('/my/draws')).rows : [];
+  S.myDay = S.my.registration ? (await api('/my/day')).days : [];
   if (S.myQ.some((t) => ['waiting', 'called', 'testing', 'needs_committee'].includes(t.status))) startPoll(10000, repaint); else stopPoll();
   const m = S.my, c = m.competition;
   if (!c) return `<div class="card empty"><h2>لا توجد دورة حالية</h2></div>`;
@@ -277,6 +278,9 @@ async function pickedFile(input) {
 function myTag(t, entryId) {
   if (!t) {
     const rows = (S.mySch || []).filter((x) => x.entryId === entryId), r = rows[rows.length - 1];
+    // يوم الحضور المحدد للتصفيات الأولية بعد نشر التوزيع
+    const dy = (S.myDay || []).find((x) => x.entryIds.includes(entryId));
+    if (dy && (!r || r.stage === 'prelim' || r.stageName === 'التصفيات الأولية')) return `<span class="tag info">التصفيات الأولية — يوم حضورك: ${esc(dy.name)}، ${esc(dy.label)}${dy.time ? '، ' + esc(dy.time) : ''}${dy.location ? ' — ' + esc(dy.location) : ''}</span>`;
     if (r && r.session) return `<span class="tag info">${esc(r.stageName)}: ${esc(r.session.when)} — ${esc(r.session.location)}</span>`;
     return `<span class="tag">موعد ${r ? esc(r.stageName) : 'المرحلة'}: بانتظار الإعلان</span>`;
   }
@@ -512,7 +516,7 @@ async function vReception() {
     const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
     const quick = el.length && el.every((e) => e.candidates.length === 1);
     return `<tr><td><b>${esc(r.name)}</b>${me.role === 'top' ? `<br><small class="note">${esc(r.sectionName)}</small>` : ''}</td><td>${esc(r.category)}</td>
-    <td><div class="chips">${r.entries.map((e) => `<span class="ent"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b> ${!e.needsCommittee ? '<span class="tag">اختبار إلكتروني</span>' : e.ticket && e.ticket.status !== 'cancelled' ? tTag(e.ticket) + (['waiting', 'needs_committee', 'no_show'].includes(e.ticket.status) ? ` <button class="btn link" data-act="tk-cancel" data-id="${e.ticket.id}">إلغاء</button>` : '') : '<span class="tag">لم يحضر</span>'}</span>`).join('')}</div></td>
+    <td><div class="chips">${r.entries.map((e) => `<span class="ent"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${e.day ? ` <span class="tag ${e.day.today ? 'ok' : 'warn'} day">${esc(e.day.name)} · ${esc(e.day.label)}${e.day.today ? '' : ' (ليس اليوم)'}</span>` : ''} ${!e.needsCommittee ? '<span class="tag">اختبار إلكتروني</span>' : e.ticket && e.ticket.status !== 'cancelled' ? tTag(e.ticket) + (['waiting', 'needs_committee', 'no_show'].includes(e.ticket.status) ? ` <button class="btn link" data-act="tk-cancel" data-id="${e.ticket.id}">إلغاء</button>` : '') : '<span class="tag">لم يحضر</span>'}</span>`).join('')}</div></td>
     <td>${el.length ? `<button class="btn ${quick ? 'pri' : ''} sm" data-act="${quick ? 'ci-quick' : 'ci-open'}" data-id="${r.id}">${quick ? 'تثبيت الحضور' : 'تسجيل الحضور…'}</button>${quick && el.length > 1 ? ` <button class="btn link" data-act="ci-open" data-id="${r.id}">اختيار</button>` : ''}` : '<span class="tag ok">حاضر</span>'}</td></tr>`;
   };
   return `<div class="head"><div><h1>الاستقبال وتسجيل الحضور</h1><p>${esc(d.stageName)} · ${me.role === 'top' ? (f.section ? esc(meta.sections[f.section]) : 'القسمان') : esc(me.sectionName)} · الأسماء مرتبة أبجديًا، والدور في الطابور بحسب وقت تثبيت الحضور</p></div><div class="acts"><a class="btn" href="#queues">الطوابير</a></div></div>
@@ -521,7 +525,7 @@ async function vReception() {
   <div class="card"><form class="filters" data-form="recf" role="search"><input type="search" id="rf-q" value="${esc(f.q)}" placeholder="ابحث بالاسم أو الهوية أو الهاتف" aria-label="بحث" autofocus>
     ${me.role === 'top' ? `<select id="rf-section" aria-label="القسم">${opts(Object.entries(meta.sections), f.section, 'القسمان')}</select>` : ''}
     <select id="rf-category" aria-label="الفئة">${opts(pub.categories.map((x) => [x.id, x.name]), f.category, 'كل الفئات')}</select>
-    <select id="rf-state" aria-label="الحضور">${opts([['absent', 'لم يحضروا'], ['present', 'حاضرون']], f.state, 'الجميع')}</select><button class="btn pri" type="submit">بحث</button></form>
+    <select id="rf-state" aria-label="الحضور">${opts([...(S.stage === 'prelim' ? [['today', 'موزّعون على اليوم']] : []), ['absent', 'لم يحضروا'], ['present', 'حاضرون']], f.state, 'الجميع')}</select><button class="btn pri" type="submit">بحث</button></form>
   <p class="note">${d.total} مسجّلًا</p>
   ${d.rows.length ? `<div class="scroll"><table class="list stack"><thead><tr><th>الاسم</th><th>الفئة</th><th>المشاركات والحضور</th><th></th></tr></thead><tbody>${d.rows.map(row).join('')}</tbody></table></div>
   <div class="pager"><span class="note">صفحة ${d.page} من ${pages}</span><div class="acts"><button class="btn sm" data-act="rpage" data-p="${d.page - 1}" ${d.page > 1 ? '' : 'disabled'}>السابق</button><button class="btn sm" data-act="rpage" data-p="${d.page + 1}" ${d.page < pages ? '' : 'disabled'}>التالي</button></div></div>`
@@ -888,6 +892,58 @@ async function vNotices() {
       <td><span class="tag ${x.status === 'sent' ? 'ok' : x.status === 'failed' ? 'bad' : 'warn'}">${esc(x.statusName)}</span>${x.error ? `<br><small class="note">${esc(x.error)}</small>` : ''}</td><td class="n">${x.attempts}</td><td>${x.status === 'failed' || x.status === 'skipped' ? `<button class="btn sm" data-act="resend" data-id="${x.id}">إعادة الإرسال</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>`;
 }
 
+// ---------- توزيع المتسابقين على أيام التصفيات ----------
+const addDays = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+function dplanFrom(d) {
+  const dates = d.days.length ? d.days.map((x) => x.date) : d.suggest.length ? d.suggest : [''];
+  const caps = {};
+  d.days.forEach((x, i) => d.groups.forEach((g) => { if (g.caps[x.id]) caps[`${i + 1}|${g.key}`] = g.caps[x.id]; }));
+  return { n: dates.length, dates, caps, section: d.section };
+}
+const capCell = (tot, reg) => `<b>${tot}</b> ${reg > tot ? `<span class="tag bad">ينقص ${reg - tot}</span>` : reg ? '<span class="tag ok">يكفي</span>' : ''}`;
+// تحديث المجاميع في مكانها دون إعادة رسم (لا يضيع موضع الكتابة)
+function capTotals() {
+  const P = S.dplan, n = P.n;
+  for (const g of S.dd.groups) { const el = document.querySelector(`[data-ctot="${CSS.escape(g.key)}"]`); let t = 0; for (let i = 1; i <= n; i++) t += P.caps[`${i}|${g.key}`] || 0; if (el) el.innerHTML = capCell(t, g.registered); }
+  for (let i = 1; i <= n; i++) { const el = document.querySelector(`[data-dtot="${i}"]`); if (el) el.innerHTML = `<b>${S.dd.groups.reduce((m, g) => m + (P.caps[`${i}|${g.key}`] || 0), 0)}</b>`; }
+}
+async function vDays() {
+  const sec = me.role === 'top' ? (S.dsec = S.dsec || 'M') : me.section;
+  const d = S.dd = await api('/days?section=' + sec);
+  if (!S.dplan || S.dplan.section !== d.section || !S.dplanDirty) { S.dplan = dplanFrom(d); S.dplanDirty = false; }
+  const P = S.dplan, dayIx = Array.from({ length: P.n }, (_, i) => i + 1);
+  const capOf = (no, k) => P.caps[`${no}|${k}`] || 0;
+  const st = !d.days.length ? ['', 'لم تُحدَّد الأيام بعد'] : !d.published ? ['warn', 'مسودة لم تُنشر للمتسابقين'] : d.changed ? ['warn', 'تغيّر التوزيع بعد آخر نشر؛ أعد النشر ليصل المتسابقين'] : ['ok', 'منشور للمتسابقين'];
+  S.dpeople = S.dpeople && S.dpeople.section === sec ? S.dpeople : { section: sec, day: '', rows: null };
+  if (S.dpeople.day !== '' && !S.dpeople.rows) S.dpeople.rows = (await api(`/days/people?section=${sec}&day=${S.dpeople.day}`)).rows;
+  const dayOpts = [...d.days.map((x) => [x.id, `${x.name} · ${x.label}`]), ['none', 'غير موزّعين']];
+  return `<div class="head"><div><h1>توزيع المتسابقين على أيام التصفيات</h1><p>حدد أيام التصفيات الأولية وسعة كل يوم لكل فرع وفئة، ثم اطلب التوزيع وراجعه، ثم اعتمده وانشره فيصل كل متسابق يومه. يُجمع صاحب أكثر من مشاركة في يوم واحد ما أمكن.</p></div>
+    ${me.role === 'top' ? `<div class="acts">${['M', 'F'].map((x) => `<button class="btn ${x === sec ? 'pri' : ''}" data-act="dsec" data-s="${x}">${esc(meta.sections[x])}</button>`).join('')}</div>` : ''}</div>
+  <div class="banner ${st[0] === 'ok' ? 'info' : 'warn'}"><b>${esc(st[1])}</b>${d.publishedAt ? ` · آخر نشر ${esc(fmt(d.publishedAt))}` : ''}${d.regClose ? ` · إغلاق التسجيل ${esc(d.regClose)}` : ''}</div>
+  <div class="kpis"><div class="kpi main"><b>${d.persons}</b><span>متسابقًا في الفروع الميدانية</span></div><div class="kpi"><b>${d.entries}</b><span>مشاركة</span></div><div class="kpi"><b>${d.unassigned}</b><span>غير موزّعة</span></div><div class="kpi"><b>${d.checkedIn}</b><span>حضرت</span></div></div>
+  <div class="card"><h2>الأيام والسعة</h2><form data-form="dplan"><p class="err" hidden></p>
+    <div class="row3"><div class="field"><label for="dp-n">عدد أيام التصفيات</label><input id="dp-n" type="number" min="1" max="14" value="${P.n}" data-dn></div>
+    ${dayIx.map((no) => `<div class="field"><label for="dp-d${no}">${esc(['اليوم الأول', 'اليوم الثاني', 'اليوم الثالث', 'اليوم الرابع', 'اليوم الخامس', 'اليوم السادس', 'اليوم السابع'][no - 1] || 'اليوم ' + no)}</label><input id="dp-d${no}" type="date" value="${esc(P.dates[no - 1] || '')}" data-dd="${no}" required></div>`).join('')}</div>
+    <div class="scroll"><table class="list caps"><thead><tr><th>الفرع والفئة</th><th>المسجلون</th>${dayIx.map((no) => `<th>يوم ${no}</th>`).join('')}<th>مجموع السعة</th></tr></thead><tbody>
+    ${d.groups.map((g) => { const tot = dayIx.reduce((n, no) => n + capOf(no, g.key), 0); return `<tr><td><b>${esc(g.branchName)}</b> · ${esc(g.categoryName)}</td><td class="n">${g.registered}</td>
+      ${dayIx.map((no) => `<td><input class="capin" type="number" min="0" max="5000" inputmode="numeric" value="${capOf(no, g.key) || ''}" placeholder="0" data-cap="${no}|${g.key}" aria-label="${esc(g.branchName + ' ' + g.categoryName)} يوم ${no}"></td>`).join('')}
+      <td class="n" data-ctot="${esc(g.key)}">${capCell(tot, g.registered)}</td></tr>`; }).join('')}
+    <tr class="sum"><td>المجموع</td><td class="n">${d.groups.reduce((n, g) => n + g.registered, 0)}</td>${dayIx.map((no) => `<td class="n" data-dtot="${no}"><b>${d.groups.reduce((n, g) => n + capOf(no, g.key), 0)}</b></td>`).join('')}<td></td></tr></tbody></table></div>
+    <div class="acts"><button class="btn" type="button" data-act="dp-even">اقتراح سعة بالتساوي</button><button class="btn pri" type="submit">حفظ الأيام والسعة</button></div>
+    <p class="note">السعة عدد المشاركات في اليوم لكل فرع وفئة. «اقتراح بالتساوي» يقسم المسجلين على الأيام، ويمكنك تعديله قبل الحفظ.</p></form></div>
+  <div class="card"><div class="head sm"><h2>التوزيع</h2><div class="acts"><button class="btn" data-act="xl" data-href="/api/days.xlsx?section=${sec}" data-n="توزيع أيام التصفيات.xlsx">تنزيل التوزيع (Excel)</button></div></div>
+    ${d.days.length ? `<div class="row3"><div class="field"><label for="dp-o">ترتيب التوزيع</label><select id="dp-o">${opts([['registration', 'بأسبقية التسجيل (الأسبق في الأيام الأولى)'], ['random', 'عشوائي'], ['name', 'أبجدي بالاسم']], S.dorder || 'registration')}</select></div></div>
+    <div class="acts"><button class="btn pri" data-act="dp-run" data-m="all">${d.days.some((x) => x.entries) ? 'إعادة توزيع الجميع' : 'توزيع المتسابقين'}</button>${d.days.some((x) => x.entries) ? '<button class="btn" data-act="dp-run" data-m="fill">توزيع غير الموزعين فقط</button>' : ''}
+      <button class="btn ${d.published && !d.changed ? '' : 'gold'}" data-act="dp-pub">اعتماد ونشر للمتسابقين</button></div>
+    <table class="list"><thead><tr><th>اليوم</th><th>التاريخ</th><th>المتسابقون</th><th>المشاركات / السعة</th></tr></thead><tbody>${d.days.map((x) => `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.label)}</td><td class="n">${x.persons}</td><td class="n">${x.entries} / ${x.cap} ${x.entries > x.cap ? '<span class="tag warn">تجاوز</span>' : ''}</td></tr>`).join('')}
+      ${d.unassigned ? `<tr><td><b>غير موزّعة</b></td><td></td><td></td><td class="n"><span class="tag bad">${d.unassigned}</span></td></tr>` : ''}</tbody></table>
+    <p class="note">«إعادة توزيع الجميع» تعيد ترتيب كل من لم يحضر، عدا من نُقل يدويًا. «غير الموزعين فقط» تضيف المسجلين الجدد دون تحريك أحد. النشر يُشعر كل متسابق بيومه، ثم يُشعر من تغيّر يومه فقط عند إعادة النشر.</p>` : '<p class="empty">احفظ الأيام والسعة أولًا.</p>'}</div>
+  ${d.days.length ? `<div class="card"><div class="head sm"><h2>قوائم الأيام</h2><div class="acts"><select id="dp-day" data-dpday aria-label="اليوم">${opts(dayOpts, S.dpeople.day, 'اختر اليوم')}</select></div></div>
+    ${S.dpeople.rows ? (S.dpeople.rows.length ? `<table class="list stack"><thead><tr><th>المتسابق</th><th>الفئة</th><th>المشاركات</th><th>نقل إلى</th></tr></thead><tbody>${S.dpeople.rows.map((p) => `<tr><td><b>${esc(p.name)}</b><br><small class="note ltr">${esc(p.phone || '')}</small></td><td>${esc(p.category)}</td>
+      <td>${p.entries.map((e) => `<span class="tag ${e.checked ? 'ok' : ''}">${esc(e.branch)}${e.dayId ? ` · ${esc((d.days.find((x) => x.id === e.dayId) || {}).name || '')}` : ' · غير موزّع'}${e.manual ? ' · يدوي' : ''}${e.checked ? ' · حضر' : ''}</span>`).join(' ')}</td>
+      <td>${p.entries.every((e) => e.checked) ? '—' : `<select data-mv="${p.regId}" aria-label="نقل ${esc(p.name)}">${opts([...d.days.map((x) => [x.id, x.name]), ['', 'غير موزّع']], '', 'اختر')}</select>`}</td></tr>`).join('')}</tbody></table>` : '<p class="empty">لا أحد في هذا اليوم.</p>') : '<p class="note">اختر يومًا لعرض قائمته ونقل من تريد.</p>'}</div>` : ''}`;
+}
+
 // ---------- قرعة المقاطع: البنك والمتابعة ----------
 async function vDraws() {
   const st = S.dst = S.dst || 'semi';
@@ -960,7 +1016,7 @@ async function vMaterials() {
     <p class="note">المذكرة لكل الفرع ما لم تخصصها بمقرر أو فئة. «المتأهلون إلى…» تجعلها لمن تأهل إلى تلك المرحلة فقط، مثل مقاطع النهائي.${me.role === 'exec' ? ' تُرفع لقسمك؛ المذكرة المشتركة للقسمين ترفعها الإدارة العليا.' : ''}</p></div>` : ''}</div>`;
 }
 
-const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults, tests: vTests, inbox: vInbox, schedule: vSchedule, notices: vNotices, materials: vMaterials, draws: vDraws };
+const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults, tests: vTests, inbox: vInbox, schedule: vSchedule, notices: vNotices, materials: vMaterials, draws: vDraws, days: vDays };
 
 // ---------- الأحداث ----------
 const val = (id) => (document.getElementById(id) || {}).value || '';
@@ -1022,6 +1078,24 @@ document.addEventListener('click', async (e) => {
       const r = await api(`/my/draws/${b.dataset.e}/${a === 'dr-ok' ? 'approve' : 'draw'}`, { method: 'POST', body: { stage: b.dataset.st, expect: +b.dataset.x || undefined } });
       if (a === 'dr-draw') await new Promise((ok) => setTimeout(ok, 600));
       toast(a === 'dr-ok' ? 'اعتُمد مقطعك' : `ظهر لك: ${r.state.current.label}`); render();
+    }
+    else if (a === 'dsec') { S.dsec = b.dataset.s; S.dplanDirty = false; S.dpeople = null; render(); }
+    else if (a === 'dp-even') {
+      const P = S.dplan;
+      for (const g of S.dd.groups) { const per = Math.floor(g.registered / P.n), extra = g.registered % P.n; for (let i = 1; i <= P.n; i++) P.caps[`${i}|${g.key}`] = per + (i <= extra ? 1 : 0); }
+      S.dplanDirty = true; render();
+    }
+    else if (a === 'dp-run') {
+      if (b.dataset.m === 'all' && S.dd.published && b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'تأكيد: إعادة توزيع الجميع'; toast('التوزيع منشور؛ إعادة التوزيع قد تغيّر أيام بعض المتسابقين، ويلزم إعادة النشر بعدها'); return; }
+      S.dorder = val('dp-o');
+      const r = await api('/days/distribute', { method: 'POST', body: { section: S.dd.section, mode: b.dataset.m, order: S.dorder } });
+      const x = r.result; toast(`وُزّعت ${x.assigned} مشاركة${x.split ? `، وقُسمت مشاركات ${x.split} على يومين` : ''}${x.unassigned ? `، ولم تتسع السعة لـ ${x.unassigned}` : ''}`);
+      S.dpeople.rows = null; render();
+    }
+    else if (a === 'dp-pub') {
+      if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'تأكيد النشر وإرسال الإشعارات'; return; }
+      const r = await api('/days/publish', { method: 'POST', body: { section: S.dd.section } });
+      toast(r.notified ? `نُشر التوزيع وأُشعر ${r.notified} متسابقًا` : 'نُشر التوزيع؛ لا تغييرات تستدعي إشعارًا'); render();
     }
     else if (a === 'dst') { S.dst = b.dataset.s; render(); }
     else if (a === 'bk-del') { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'تأكيد الحذف'; return; } await api('/admin/bank/' + id, { method: 'DELETE' }); toast('حُذف المقطع من البنك'); render(); }
@@ -1119,6 +1193,15 @@ function specToggle() { const r = $('#u-r'); if (!r) return; $('#u-spec-f').hidd
 document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'u-r') specToggle();
+  if (t.dataset.dn !== undefined && S.dplan) {
+    const n = Math.min(14, Math.max(1, parseInt(t.value, 10) || 1)), P = S.dplan;
+    for (let i = P.dates.length; i < n; i++) P.dates[i] = P.dates[i - 1] ? addDays(P.dates[i - 1], 1) : '';
+    P.n = n; P.dates.length = n; S.dplanDirty = true; render();
+  }
+  if (t.dataset.dd && S.dplan) { S.dplan.dates[+t.dataset.dd - 1] = t.value; S.dplanDirty = true; }
+  if (t.dataset.cap && S.dplan) { S.dplan.caps[t.dataset.cap] = Math.max(0, parseInt(t.value, 10) || 0); S.dplanDirty = true; capTotals(); }
+  if (t.dataset.dpday !== undefined) { S.dpeople = { section: S.dd.section, day: t.value, rows: null }; render(); }
+  if (t.dataset.mv) { (async () => { try { await api('/days/move', { method: 'POST', body: { registrationId: +t.dataset.mv, dayId: t.value ? +t.value : null } }); toast('نُقل المتسابق'); S.dpeople.rows = null; render(); } catch (e) { toast(e.message); } })(); }
   if (t.dataset.mbr) { const cu = document.getElementById(t.dataset.mbr + '-cu'); if (cu) cu.innerHTML = opts(pub.curricula.filter((x) => x.branch === t.value).map((x) => [x.id, currLabel(x)]), '', 'كل مقررات الفرع'); }
   if (t.id === 'u-role') { S.usersRole = t.value; render(); }
   if (t.dataset.ex && S.exam) {
@@ -1178,6 +1261,12 @@ document.addEventListener('submit', async (e) => {
       const r = await api('/sessions', { method: 'POST', body }); toast(`حُفظ الموعد، وأُشعر ${r.notified} متسابقًا`); render();
     }
     else if (k === 'session-edit') { const r = await api('/sessions/' + f.dataset.id, { method: 'PUT', body: { ...whenBody('se'), location: val('se-loc'), note: val('se-note') } }); closeModal(); toast(r.notified ? `حُفظ التعديل، وأُشعر ${r.notified} متسابقًا` : 'لا تغيير'); render(); }
+    else if (k === 'dplan') {
+      const P = S.dplan, days = Array.from({ length: P.n }, (_, i) => ({ date: P.dates[i] || '' }));
+      if (days.some((x) => !x.date)) throw new Error('أدخل تاريخ كل يوم');
+      const caps = []; for (const g of S.dd.groups) for (let i = 1; i <= P.n; i++) { const v = P.caps[`${i}|${g.key}`] || 0; if (v) caps.push({ dayNo: i, branch: g.branch, categoryId: g.categoryId, cap: v }); }
+      await api('/days', { method: 'PUT', body: { section: S.dd.section, days, caps } }); S.dplanDirty = false; toast('حُفظت الأيام والسعة'); render();
+    }
     else if (k === 'bank-add') { await api('/admin/bank', { method: 'POST', body: { stage: S.dst, curriculumId: val('bk-c'), surah: val('bk-s'), ayahFrom: val('bk-f'), ayahTo: val('bk-t'), note: val('bk-n') } }); toast('أُضيف المقطع إلى البنك'); const keep = val('bk-c'); await render(); const sel = document.getElementById('bk-c'); if (sel) sel.value = keep; }
     else if (k === 'bank-import') {
       const fl = $('#bi-f').files[0]; if (!fl) throw new Error('اختر الملف');
