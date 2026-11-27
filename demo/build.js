@@ -32,7 +32,9 @@ const bundle = out.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 // (3) الدمج
 const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
 const css = fs.readFileSync(path.join(ROOT, 'public/style.css'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'demo.css'), 'utf8');
-const app = fs.readFileSync(path.join(ROOT, 'public/app.js'), 'utf8').replace(/<\/script/gi, '<\\/script');
+const dataUri = (f) => 'data:image/png;base64,' + fs.readFileSync(path.join(ROOT, 'public', f)).toString('base64');
+const app = fs.readFileSync(path.join(ROOT, 'public/app.js'), 'utf8').replace(/<\/script/gi, '<\\/script')
+  .replace('"/emblem-light.png"', () => `"${dataUri('emblem-light.png')}"`).replace('"/emblem-color.png"', () => `"${dataUri('emblem-color.png')}"`);
 const icon = 'data:image/svg+xml;base64,' + Buffer.from(fs.readFileSync(path.join(ROOT, 'public/icon.svg'))).toString('base64');
 let page = html
   .replace('<link rel="icon" href="/icon.svg" type="image/svg+xml">', `<link rel="icon" href="${icon}" type="image/svg+xml">`)
