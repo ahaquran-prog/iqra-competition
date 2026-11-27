@@ -436,6 +436,18 @@ function client(base) {
     ok('إعادة القرعة تتطلب سببًا', r.status === 400);
     r = await execM('POST', `/api/admin/draws/${e5}/reset`, { stage: 'semi', reason: 'خطأ في البنك' });
     ok('إعادة القرعة تمنح ثلاث محاولات جديدة وتُشعر المتسابق', r.status === 200 && r.data.state.attempts === 0 && r.data.state.canDraw);
+    ok('مهلة القرعة يومان وتظهر للمتسابق', (r.data.state.closesAt - Date.now()) > 47.9 * 3600e3 && (r.data.state.closesAt - Date.now()) <= 48 * 3600e3 && !!r.data.state.closes);
+    const CF = require('../lib/config'), dh = CF.drawHours; CF.drawHours = 0.00005;
+    await new Promise((ok) => setTimeout(ok, 300));
+    d5 = await myD();
+    r = await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 1 });
+    ok('بعد انتهاء المهلة لا يسحب المتسابق', d5.expired && !d5.canDraw && r.status === 409 && /انتهت مهلة القرعة/.test(r.data.error));
+    r = await execM('POST', `/api/admin/draws/${e5}/draw`, { stage: 'semi', expect: 1 });
+    ok('بعد المهلة تسحب الإدارة نيابة عنه', r.status === 200 && r.data.state.attempts === 1);
+    ok('ولا يعتمد المتسابق بعد المهلة؛ يُعتمد آخر مقطع ظهر له', (await c5('POST', `/api/my/draws/${e5}/approve`, { stage: 'semi' })).status === 409);
+    await execM('POST', `/api/admin/draws/${e5}/reset`, { stage: 'semi', reason: 'تمديد بقرار اللجنة' });
+    CF.drawHours = dh;
+    ok('إعادة القرعة تبدأ مهلة جديدة', (await myD()).canDraw);
     // يبقى في البنك مقطع واحد: ق 16–22
     bk = (await admin('GET', '/api/admin/bank?stage=semi')).data.curricula.find((c) => c.name === 'تدوير · اليافعون');
     for (const i of bk.items.filter((i) => !(i.surah === 50 && i.ayahFrom === 16))) await admin('DELETE', '/api/admin/bank/' + i.id);

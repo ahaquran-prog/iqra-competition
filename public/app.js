@@ -220,11 +220,14 @@ function myDraws(entryId) {
   return (S.myD || []).filter((d) => d.entryId === entryId).map((d) => {
     const cur = d.current, last = d.attempts >= d.max || !d.canDraw;
     let body;
+    const dl = d.closes ? `<p class="note">آخر موعد للقرعة: <b>${esc(d.closes)}</b>. إن لم تعتمد قبله يُعتمد آخر مقطع ظهر لك.</p>` : '';
     if (d.status === 'approved') body = `<p><span class="tag ok">مقطعك المعتمد</span> <b>${esc(cur.label)}</b></p>`;
-    else if (!d.attempts) body = d.locked ? '<p class="note">أُقفلت القرعة بعد تسجيل حضورك.</p>' : `<p>يختار النظام مقطعك عشوائيًا من بنك مقاطع مسارك وفئتك. لديك ${d.max} محاولات: بعد المقطع الأول والثاني تعتمده أو تختار مقطعًا آخر، والمقطع الثالث لا خيار بعده إلا اعتماده. لا يمكن الرجوع إلى مقطع سابق.</p>
+    else if (d.expired && !d.attempts) body = `<p class="note">انتهت مهلة القرعة (${esc(d.closes)}) ولم تختر مقطعًا. تواصل مع إدارة المسابقة.</p>`;
+    else if (d.expired) body = `<p><span class="tag ok">مقطعك النافذ</span> <b>${esc(cur.label)}</b></p><p class="note">انتهت مهلة القرعة (${esc(d.closes)})، فاعتُمد آخر مقطع ظهر لك.</p>`;
+    else if (!d.attempts) body = d.locked ? '<p class="note">أُقفلت القرعة بعد تسجيل حضورك.</p>' : `${dl}<p>يختار النظام مقطعك عشوائيًا من بنك مقاطع مسارك وفئتك. لديك ${d.max} محاولات: بعد المقطع الأول والثاني تعتمده أو تختار مقطعًا آخر، والمقطع الثالث لا خيار بعده إلا اعتماده. لا يمكن الرجوع إلى مقطع سابق.</p>
       <div class="acts"><button class="btn pri" data-act="dr-draw" data-e="${entryId}" data-st="${d.stage}" data-x="1">اختيار المقطع</button></div>`;
     else body = `<p><span class="tag ${last ? 'warn' : 'info'}">المحاولة ${cur.attempt} من ${d.max}</span> <b>${esc(cur.label)}</b></p>
-      ${d.locked ? '<p class="note">أُقفلت القرعة بعد تسجيل حضورك، ويُعتمد هذا المقطع.</p>' : `<div class="acts"><button class="btn pri" data-act="dr-ok" data-e="${entryId}" data-st="${d.stage}">اعتماد هذا المقطع</button>${d.canDraw ? `<button class="btn" data-act="dr-draw" data-e="${entryId}" data-st="${d.stage}" data-x="${d.attempts + 1}">اختيار مقطع آخر (${d.max - d.attempts === 1 ? 'المحاولة الأخيرة' : 'بقيت ' + (d.max - d.attempts)})</button>` : ''}</div>
+      ${d.locked ? '<p class="note">أُقفلت القرعة بعد تسجيل حضورك، ويُعتمد هذا المقطع.</p>' : `${dl}<div class="acts"><button class="btn pri" data-act="dr-ok" data-e="${entryId}" data-st="${d.stage}">اعتماد هذا المقطع</button>${d.canDraw ? `<button class="btn" data-act="dr-draw" data-e="${entryId}" data-st="${d.stage}" data-x="${d.attempts + 1}">اختيار مقطع آخر (${d.max - d.attempts === 1 ? 'المحاولة الأخيرة' : 'بقيت ' + (d.max - d.attempts)})</button>` : ''}</div>
       <p class="note">${d.canDraw ? 'إن اخترت مقطعًا آخر فلا رجوع إلى هذا المقطع.' : d.attempts >= d.max ? 'هذه المحاولة الأخيرة؛ لا خيار إلا اعتماد المقطع.' : 'لا توجد مقاطع أخرى في البنك؛ اعتمد هذا المقطع.'}</p>`}`;
     const prev = d.draws.filter((x) => !x.approved && (!cur || x.attempt !== cur.attempt));
     return `<div class="mats draw"><span class="subhead">قرعة مقطع ${esc(d.stageName)}</span>${body}
@@ -880,7 +883,7 @@ async function vDraws() {
   const stN = st === 'semi' ? 'قبل النهائي' : 'النهائي';
   const tags = { none: '', pending: 'warn', approved: 'ok' };
   const total = b.curricula.reduce((n, c) => n + c.items.length, 0);
-  return `<div class="head"><div><h1>قرعة مقاطع التلاوة</h1><p>بعد نشر كشف التأهل يختار كل متأهل مقطعه عشوائيًا من بنك مساره وفئته، بثلاث محاولات. المقطع المعتمد يظهر للمحكمين في استمارة المرحلة.</p></div>
+  return `<div class="head"><div><h1>قرعة مقاطع التلاوة</h1><p>بعد نشر كشف التأهل يختار كل متأهل مقطعه عشوائيًا من بنك مساره وفئته، بثلاث محاولات خلال يومين. المقطع المعتمد يظهر للمحكمين في استمارة المرحلة.</p></div>
     <div class="acts">${['semi', 'final'].map((x) => `<button class="btn ${x === st ? 'pri' : ''}" data-act="dst" data-s="${x}">${x === 'semi' ? 'قبل النهائي' : 'النهائي'}</button>`).join('')}</div></div>
   <div class="card"><div class="head sm"><h2>بنك مقاطع ${stN} (${total})</h2><div class="acts"><button class="btn" data-act="xl" data-href="/api/admin/bank.xlsx?stage=${st}" data-n="بنك مقاطع ${stN}.xlsx">تنزيل البنك (Excel)</button></div></div>
     ${b.curricula.map((c) => `<details class="bank"${c.items.length ? '' : ''}><summary><b>${esc(c.name)}</b> <span class="tag ${c.items.length ? (c.items.length < 3 ? 'warn' : 'ok') : ''}">${c.items.length} ${c.items.length === 1 ? 'مقطع' : 'مقاطع'}</span></summary>
@@ -900,10 +903,10 @@ async function vDraws() {
     <p><span class="tag">لم يسحب ${d.counts.none}</span> <span class="tag warn">لم يعتمد ${d.counts.pending}</span> <span class="tag ok">معتمد ${d.counts.approved}</span></p>
     ${d.rows.length ? `<table class="list stack"><thead><tr><th>المتسابق</th>${me.role === 'top' ? '<th>القسم</th>' : ''}<th>المسار والفئة</th><th>الحالة</th><th>المقطع</th><th></th></tr></thead><tbody>
     ${d.rows.map((r) => `<tr><td>${esc(r.name)}</td>${me.role === 'top' ? `<td>${esc(r.sectionName)}</td>` : ''}<td>${esc(r.group)}</td>
-      <td><span class="tag ${tags[r.status]}">${esc(r.statusName)}</span>${r.attempts ? ` <small class="note">${r.attempts} من ${r.max}</small>` : ''}${!r.announced ? ' <small class="note">التأهل غير منشور</small>' : r.locked ? ' <small class="note">حضر</small>' : ''}</td>
+      <td><span class="tag ${tags[r.status]}">${esc(r.statusName)}</span>${r.attempts ? ` <small class="note">${r.attempts} من ${r.max}</small>` : ''}${!r.announced ? ' <small class="note">التأهل غير منشور</small>' : r.locked ? ' <small class="note">حضر</small>' : r.status !== 'approved' && r.closes ? `<br><small class="note">${r.expired ? 'انتهت المهلة' : 'المهلة حتى'} ${esc(r.closes)}</small>` : ''}</td>
       <td>${r.current ? esc(r.current.label) : '—'}</td>
-      <td>${d.canAct && !r.locked && r.open ? `${r.canDraw && r.status === 'none' ? `<button class="btn sm" data-act="ad-draw" data-e="${r.entryId}" data-x="${r.attempts + 1}">سحب نيابة عنه</button>` : ''}${r.canApprove ? `<button class="btn sm" data-act="ad-ok" data-e="${r.entryId}">اعتماد نيابة عنه</button>` : ''}${r.attempts ? `<button class="btn sm badb" data-act="ad-reset" data-e="${r.entryId}">إعادة القرعة</button>` : ''}` : ''}</td></tr>`).join('')}</tbody></table>` : `<p class="note">لا يوجد متأهلون إلى ${stN} في مقررات التلاوة بعد.</p>`}
-    <p class="note">من لم يعتمد مقطعه يُعتمد له آخر مقطع ظهر له. تُقفل القرعة عند تسجيل حضوره لهذه المرحلة. السحب نيابة عن المتسابق يتبع القواعد نفسها ويُسجَّل في سجل التدقيق.</p></div>`;
+      <td>${d.canAct && !r.locked && r.open ? `${r.adminCanDraw && r.status === 'none' ? `<button class="btn sm" data-act="ad-draw" data-e="${r.entryId}" data-x="${r.attempts + 1}">سحب نيابة عنه</button>` : ''}${r.adminCanApprove ? `<button class="btn sm" data-act="ad-ok" data-e="${r.entryId}">اعتماد نيابة عنه</button>` : ''}${r.attempts ? `<button class="btn sm badb" data-act="ad-reset" data-e="${r.entryId}">إعادة القرعة</button>` : ''}` : ''}</td></tr>`).join('')}</tbody></table>` : `<p class="note">لا يوجد متأهلون إلى ${stN} في مقررات التلاوة بعد.</p>`}
+    <p class="note">مهلة القرعة يومان من نشر التأهل (أو من إعادة القرعة). من لم يعتمد مقطعه يُعتمد له آخر مقطع ظهر له، ومن لم يسحب تسحب له الإدارة. تُقفل القرعة عند تسجيل حضوره لهذه المرحلة. السحب نيابة عن المتسابق يتبع القواعد نفسها ويُسجَّل في سجل التدقيق.</p></div>`;
 }
 
 // ---------- مذكرات المقررات: الإدارة ----------
