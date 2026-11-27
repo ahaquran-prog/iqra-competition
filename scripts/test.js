@@ -489,6 +489,14 @@ function client(base) {
     r = await execM('POST', '/api/sessions', { stage: 'prelim', branch: 'hifz', startsAt: Date.now() + 3 * 3600e3, location: 'مقر الجمعية — القاعة الكبرى' });
     ok('تحديد موعد التصفيات يُشعر المعنيين في القسم', r.status === 200 && r.data.notified > 0);
     const sid = r.data.session.id;
+    r = await execM('POST', '/api/sessions', { stage: 'semi', branch: 'hifz', startsAt: Date.UTC(2026, 11, 3, 13, 0), days: 3, endTime: '21:00', location: 'مقر الجمعية' });
+    ok('موعد بمدة أيام: يظهر من اليوم الأول إلى الأخير مع وقت الانتهاء', r.status === 200 && r.data.session.days === 3 && /3 أيام: من الخميس، 3 ديسمبر إلى السبت، 5 ديسمبر، يوميًا من 4:00 م إلى 9:00 م/.test(r.data.session.when.replace(/\u200f/g, '')), r.data.session && r.data.session.when);
+    const sid3 = r.data.session.id;
+    r = await execM('PUT', '/api/sessions/' + sid3, { startsAt: Date.UTC(2026, 11, 3, 13, 0), days: 1, endTime: '21:00', location: 'مقر الجمعية' });
+    ok('تغيير المدة وحدها تعديل يُشعر به', r.status === 200 && r.data.session.version === 2 && /^الخميس، 3 ديسمبر، من 4:00 م إلى 9:00 م$/.test(r.data.session.when.replace(/\u200f/g, '')), r.data.session && r.data.session.when);
+    ok('رفض مدة غير صحيحة', (await execM('PUT', '/api/sessions/' + sid3, { startsAt: Date.UTC(2026, 11, 3, 13, 0), days: 0, location: 'x' })).status === 400);
+    ok('رفض وقت انتهاء قبل البدء', (await execM('PUT', '/api/sessions/' + sid3, { startsAt: Date.UTC(2026, 11, 3, 13, 0), days: 2, endTime: '15:00', location: 'x' })).status === 400);
+    db.prepare('DELETE FROM stage_sessions WHERE id=?').run(sid3);
     r = await execF('PUT', '/api/sessions/' + sid, { startsAt: Date.now(), location: 'x' });
     ok('تنفيذية النساء لا تعدّل موعد قسم الرجال', r.status === 404);
     r = await execM('PUT', '/api/sessions/' + sid, { startsAt: Date.now() + 5 * 3600e3, location: 'مقر الجمعية — القاعة الكبرى' });

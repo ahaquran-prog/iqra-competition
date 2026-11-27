@@ -135,7 +135,7 @@ function vHome() {
     <p>الدورة ${esc(c.number)} · ${esc(c.year)}</p>
     <div class="facts"><span><b>حالة التسجيل</b>${esc(c.state.label)}</span><span><b>فتح التسجيل</b>${esc(dateLabel(c.regOpen))}</span><span><b>إغلاق التسجيل</b>${esc(dateLabel(c.regClose))}</span></div>
     <div class="acts">${!me ? `${c.state.open ? '<a class="btn gold" href="#signup">بدء التسجيل</a>' : ''}<a class="btn ghost" href="#login">تسجيل الدخول</a>` : `<a class="btn gold" href="#${homeOf()}">مساحة العمل</a>`}</div></div>
-    <figure class="quote"><span class="glyph">إ</span><blockquote>«خيركم من تعلّم القرآن وعلّمه»</blockquote><figcaption>رواه البخاري</figcaption><p class="motto">علمٌ يُتقن… وأثرٌ يمتد</p></figure></div></section>
+    <figure class="quote"><blockquote>«خيركم من تعلّم القرآن وعلّمه»</blockquote><p class="motto">علمٌ يُتقن… وأثرٌ يمتد</p></figure></div></section>
   <h2 class="sec-title">الفئات العمرية</h2>
   <p class="note">تُحدَّد الفئة تلقائيًا من سنة الميلاد، ولا يختارها المتسابق.</p>
   <div class="cats">${cats.map((x) => `<div class="cat"><b>${esc(x.name)}</b><span class="yrs">${esc(yrs(x))}</span><span class="br">${x.branches.map((k) => esc((pub.branches.find((b) => b.code === k) || {}).name || k)).join('، ')}</span></div>`).join('')}</div>
@@ -406,7 +406,7 @@ async function vSettings() {
     <div class="field"><label for="k-notes">ملاحظات داخلية</label><textarea id="k-notes">${esc(c.notes)}</textarea></div>
     <button class="btn pri" type="submit">حفظ بيانات الدورة</button></form></details>
   <details class="blk"><summary>الفئات العمرية (تُحسب من سنة الميلاد)</summary><form data-form="cats"><p class="err" hidden></p><div class="scroll"><table class="edit-table"><thead><tr><th>الفئة</th><th>من سنة</th><th>إلى سنة</th><th>الفروع المسموحة</th><th></th></tr></thead><tbody id="cat-rows">
-    ${a.categories.map((x) => catRow(x, codes)).join('')}</tbody></table></div><p class="note">اترك «من سنة» فارغًا للفئة المفتوحة من الأقدم (مثل: 2008 فما قبل). يرفض الخادم الحدود المتداخلة.</p>
+    ${a.categories.map((x) => catRow(x, codes)).join('')}</tbody></table></div><p class="note">اترك «من سنة» فارغًا للفئة المفتوحة من الأقدم (مثل: 2009 فما قبل). يرفض الخادم الحدود المتداخلة.</p>
     <div class="acts"><button class="btn" type="button" data-act="add-cat">إضافة فئة</button><button class="btn pri" type="submit">حفظ الفئات</button></div></form></details>
   <details class="blk"><summary>المقررات والمسارات</summary><form data-form="curr"><p class="err" hidden></p><div class="scroll"><table class="edit-table"><thead><tr><th>الفرع</th><th>رمز المسار</th><th>اسم المسار</th><th>الفئة</th><th>المقرر</th><th>المقطع: سورة (رقم)</th><th>من آية</th><th>إلى آية</th><th></th></tr></thead><tbody id="curr-rows">
     ${a.curricula.map((x) => currRow(x, codes, catOpts)).join('')}</tbody></table></div><p class="note">رمز المسار بالإنجليزية (مثل cat، j5، tartil، tadweer، main). في الحفظ يختار المتسابق مسارًا واحدًا، وفي التلاوة ترتيل أو تدوير. «المقطع» لمقررات التلاوة: رقم السورة ونطاق الآيات، ومنه تُعرض الآيات في مصفوفة التجويد للمحكم.</p>
@@ -806,16 +806,27 @@ async function vInbox() {
 }
 
 // ---------- مواعيد المراحل ----------
+// حقول الموعد: اليوم الأول ووقت البدء، والمدة بالأيام، ووقت الانتهاء اليومي (اختياري)
+const pad2 = (n) => String(n).padStart(2, '0');
+function whenFields(pre, x) {
+  const d = x ? new Date(x.startsAt) : null;
+  const date = d ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : '', time = d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : '16:00';
+  return `<div class="row2"><div class="field"><label for="${pre}-d">اليوم الأول</label><input id="${pre}-d" type="date" value="${date}" required></div>
+    <div class="field"><label for="${pre}-n">المدة (أيام متتالية)</label><input id="${pre}-n" type="number" min="1" max="30" value="${x ? x.days : 1}" required></div></div>
+    <div class="row2"><div class="field"><label for="${pre}-t">يبدأ يوميًا الساعة</label><input id="${pre}-t" type="time" value="${time}" required></div>
+    <div class="field"><label for="${pre}-e">وينتهي الساعة (اختياري)</label><input id="${pre}-e" type="time" value="${x ? esc(x.endTime) : ''}"></div></div>`;
+}
+const whenBody = (pre) => { const at = new Date(`${val(pre + '-d')}T${val(pre + '-t') || '00:00'}`).getTime(); if (!Number.isFinite(at)) throw new Error('أدخل اليوم الأول ووقت البدء'); return { startsAt: at, days: val(pre + '-n'), endTime: val(pre + '-e') }; };
 async function vSchedule() {
   const d = S.sch = await api('/sessions');
   const BR = [['', 'كل الفروع'], ...pub.branches.filter((b) => b.registrable).map((b) => [b.code, b.name])];
   return `<div class="head"><div><h1>مواعيد المراحل</h1><p>يظهر الموعد في حساب كل متسابق معني به: المسجلون في التصفيات، والمتأهلون في المراحل التالية. تحديد الموعد أو تغييره يرسل إشعارًا، ويصل تذكير قبله.</p></div></div>
-  <div class="grid2"><div class="card"><h2>المواعيد</h2>${d.sessions.length ? `<table class="list stack"><thead><tr><th>المرحلة</th>${me.role === 'top' ? '<th>القسم</th>' : ''}<th>الفرع</th><th>الموعد</th><th>الموقع</th><th></th></tr></thead><tbody>
+  <div class="grid2"><div class="card"><h2>المواعيد</h2>${d.sessions.length ? `<table class="list stack"><thead><tr><th>المرحلة</th>${me.role === 'top' ? '<th>القسم</th>' : ''}<th>الفرع</th><th>الموعد والمدة</th><th>الموقع</th><th></th></tr></thead><tbody>
     ${d.sessions.map((x) => `<tr><td>${esc(x.stageName)}</td>${me.role === 'top' ? `<td>${esc(x.sectionName)}</td>` : ''}<td>${esc(x.branchName)}</td><td>${esc(x.when)}${x.version > 1 ? ' <span class="tag warn">معدّل</span>' : ''}</td><td>${esc(x.location)}${x.note ? `<br><small class="note">${esc(x.note)}</small>` : ''}</td><td><button class="btn sm" data-act="ss-edit" data-id="${x.id}">تعديل</button></td></tr>`).join('')}</tbody></table>` : '<p class="note">لم تُحدَّد مواعيد بعد؛ يرى المتسابقون «بانتظار الإعلان».</p>'}</div>
   <div class="card"><h2>موعد جديد</h2><form data-form="session"><p class="err" hidden></p>
     <div class="row2"><div class="field"><label for="ss-st">المرحلة</label><select id="ss-st">${opts(STG, 'prelim')}</select></div>${me.role === 'top' ? `<div class="field"><label for="ss-sec">القسم</label><select id="ss-sec">${opts(Object.entries(meta.sections), 'M')}</select></div>` : ''}</div>
     <div class="field"><label for="ss-br">الفرع</label><select id="ss-br">${opts(BR, '')}</select><small>موعد الفرع المحدد يتقدم على موعد «كل الفروع».</small></div>
-    <div class="field"><label for="ss-at">التاريخ والوقت</label><input id="ss-at" type="datetime-local" required></div>
+    ${whenFields('ss', null)}
     <div class="field"><label for="ss-loc">الموقع</label><input id="ss-loc" required placeholder="مثل: مقر الجمعية — القاعة الكبرى"></div>
     <div class="field"><label for="ss-note">ملاحظة للمتسابقين</label><input id="ss-note"></div>
     <button class="btn pri" type="submit">حفظ وإشعار المعنيين</button></form></div></div>`;
@@ -928,7 +939,7 @@ document.addEventListener('click', async (e) => {
     else if (a === 'toggle-u') { const u = S.users.find((x) => x.id === +id); await api('/users/' + id, { method: 'PATCH', body: { active: !u.active } }); toast(u.active ? 'أُوقف الحساب' : 'فُعّل الحساب'); render(); }
     else if (a === 'ss-edit') { const x = S.sch.sessions.find((y) => y.id === +id);
       modal('تعديل موعد ' + x.stageName + ' — ' + x.branchName, `<p class="note">${esc(x.sectionName)}. يرسل التعديل إشعار «تغيير الموعد» للمعنيين.</p><form data-form="session-edit" data-id="${x.id}"><p class="err" hidden></p>
-        <div class="field"><label for="se-at">التاريخ والوقت</label><input id="se-at" type="datetime-local" value="${toLocal(x.startsAt)}" required></div><div class="field"><label for="se-loc">الموقع</label><input id="se-loc" value="${esc(x.location)}" required></div><div class="field"><label for="se-note">ملاحظة</label><input id="se-note" value="${esc(x.note)}"></div>
+        ${whenFields('se', x)}<div class="field"><label for="se-loc">الموقع</label><input id="se-loc" value="${esc(x.location)}" required></div><div class="field"><label for="se-note">ملاحظة</label><input id="se-note" value="${esc(x.note)}"></div>
         <div class="acts"><button class="btn pri" type="submit">حفظ وإشعار المعنيين</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`); }
     else if (a === 'rem-run') { const r = await api('/admin/reminders', { method: 'POST' }); toast(r.sent ? `أُرسل ${r.sent} تذكيرًا` : 'لا توجد تذكيرات مستحقة الآن'); render(); }
     else if (a === 'mdl') { b.disabled = true; try { await download(id, b.dataset.n); if (view === 'my') setTimeout(repaint, 400); } finally { b.disabled = false; } }
@@ -1074,11 +1085,11 @@ document.addEventListener('submit', async (e) => {
     else if (k === 'withdraw') { await api('/my/withdraw', { method: 'POST', body: { reason: val('wd-r') } }); closeModal(); toast('سُجّل انسحابك'); render(); }
     else if (k === 'phones') { await api('/my/profile', { method: 'PATCH', body: { phone: val('ph-1'), phone2: val('ph-2'), email: val('ph-e') } }); closeModal(); toast('حُفظت أرقام التواصل'); render(); }
     else if (k === 'session') {
-      const body = { stage: val('ss-st'), branch: val('ss-br'), startsAt: new Date(val('ss-at')).getTime(), location: val('ss-loc'), note: val('ss-note') };
+      const body = { stage: val('ss-st'), branch: val('ss-br'), ...whenBody('ss'), location: val('ss-loc'), note: val('ss-note') };
       if ($('#ss-sec')) body.section = val('ss-sec');
       const r = await api('/sessions', { method: 'POST', body }); toast(`حُفظ الموعد، وأُشعر ${r.notified} متسابقًا`); render();
     }
-    else if (k === 'session-edit') { const r = await api('/sessions/' + f.dataset.id, { method: 'PUT', body: { startsAt: new Date(val('se-at')).getTime(), location: val('se-loc'), note: val('se-note') } }); closeModal(); toast(r.notified ? `حُفظ التعديل، وأُشعر ${r.notified} متسابقًا` : 'لا تغيير'); render(); }
+    else if (k === 'session-edit') { const r = await api('/sessions/' + f.dataset.id, { method: 'PUT', body: { ...whenBody('se'), location: val('se-loc'), note: val('se-note') } }); closeModal(); toast(r.notified ? `حُفظ التعديل، وأُشعر ${r.notified} متسابقًا` : 'لا تغيير'); render(); }
     else if (k === 'material') { const r = await api('/admin/materials', { method: 'POST', body: { ...matBody('mt'), publish: $('#mt-p').checked, file: await pickedFile($('#mt-f')) } }); toast(r.material.published ? `رُفعت المذكرة وأُشعر ${r.notified} متسابقًا` : 'رُفعت المذكرة مسودة'); render(); }
     else if (k === 'matedit') { const r = await api('/admin/materials/' + f.dataset.id, { method: 'PUT', body: matBody('me') }); closeModal(); toast(r.notified ? `حُفظت، وأُشعر ${r.notified} متسابقًا أُضيفوا` : 'حُفظت المذكرة'); render(); }
     else if (k === 'matfile') { const r = await api(`/admin/materials/${f.dataset.id}/file`, { method: 'PUT', body: { file: await pickedFile($('#mf-f')) } }); closeModal(); toast(`رُفعت النسخة ${r.material.version}${r.notified ? ` وأُشعر ${r.notified} متسابقًا` : ''}`); render(); }

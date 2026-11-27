@@ -83,8 +83,8 @@ function client(base) {
   }
   // المواعيد: التصفيات اليوم في القسمين، وقبل النهائي بعد يومين
   const day = (d, h) => { const t = new Date(); t.setDate(t.getDate() + d); t.setHours(h, 0, 0, 0); return t.getTime(); };
-  await mgr.M('POST', '/api/sessions', { stage: 'prelim', branch: '', startsAt: day(0, 16), location: 'مقر جمعية اقرأ — قاعات التصفيات', note: 'يرجى الحضور قبل الموعد بنصف ساعة مع الهوية' });
-  await mgr.F('POST', '/api/sessions', { stage: 'prelim', branch: '', startsAt: day(0, 16), location: 'مقر جمعية اقرأ — قسم النساء' });
+  await mgr.M('POST', '/api/sessions', { stage: 'prelim', branch: '', startsAt: day(0, 16), days: 3, endTime: '21:00', location: 'مقر جمعية اقرأ — قاعات التصفيات', note: 'يرجى الحضور قبل الموعد بنصف ساعة مع الهوية' });
+  await mgr.F('POST', '/api/sessions', { stage: 'prelim', branch: '', startsAt: day(0, 16), days: 3, endTime: '20:00', location: 'مقر جمعية اقرأ — قسم النساء' });
   // اللجان: تكليف المحكمين والمنسق، ثم حضور معظم المقبولين وبعض النداءات
   const adm = client(base); await adm('POST', '/api/login', { login: 'admin', password: PASS });
   const uid = (l) => db.prepare('SELECT id FROM users WHERE login=?').get(l).id;
@@ -163,7 +163,7 @@ function client(base) {
   const semiT = (await mgr.M('GET', '/api/committees?stage=semi')).committees.find((k) => k.name.includes('التدوير'));
   for (const l of ['judge.t1', 'judge.t2', 'judge.t3', 'judge.t4', 'judge.t5']) await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid(l), kind: 'judge' });
   await mgr.M('POST', `/api/committees/${semiT.id}/members`, { userId: uid('coord.m'), kind: 'coordinator' });
-  await mgr.M('POST', '/api/sessions', { stage: 'semi', branch: 'tilawa', startsAt: day(2, 17), location: 'مقر جمعية اقرأ — القاعة الرئيسية' });
+  await mgr.M('POST', '/api/sessions', { stage: 'semi', branch: 'tilawa', startsAt: day(4, 17), endTime: '21:00', location: 'مقر جمعية اقرأ — القاعة الرئيسية' });
   const rs = await mgr.M('GET', '/api/reception?stage=semi');
   for (const r of rs.rows) await mgr.M('POST', '/api/checkin', { registrationId: r.id, stage: 'semi', items: r.entries.map((e) => ({ entryId: e.id })) });
   // اختبارات التفسير: أسئلة تجريبية للعرض فقط، وليست بنك الأسئلة المعتمد
