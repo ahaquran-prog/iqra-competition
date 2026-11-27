@@ -5,11 +5,13 @@
 const db = require('../lib/db');
 const auth = require('../lib/auth');
 
-const [username, ...nameParts] = process.argv.slice(2);
+const R = require('../lib/rules');
+const [arg, ...nameParts] = process.argv.slice(2);
+const username = arg && (R.normId(arg) || arg);
 const name = nameParts.join(' ').trim() || 'الإدارة العليا';
-if (!username || !/^[A-Za-z][A-Za-z0-9._@-]{2,63}$/.test(username)) {
+if (!username || !(R.normId(arg) || /^[A-Za-z][A-Za-z0-9._@-]{2,63}$/.test(username))) {
   console.error('الاستخدام: npm run create-admin -- <اسم_المستخدم> "<الاسم الكامل>"');
-  console.error('اسم المستخدم يبدأ بحرف إنجليزي، 3 أحرف على الأقل، بدون مسافات.');
+  console.error('اسم المستخدم: الرقم الشخصي، أو اسم بالإنجليزية يبدأ بحرف (3 أحرف على الأقل، بدون مسافات).');
   process.exit(1);
 }
 const pass = auth.tempPassword();

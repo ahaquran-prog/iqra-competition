@@ -514,9 +514,10 @@ app.get('/api/users', need(isTop), wrap((req) => {
 }));
 app.post('/api/users', need(isTop), wrap((req) => {
   const b = req.body || {}, f = staffFields(b, false); checkStaff(f);
-  const login = str(b.login, 64, 'اسم المستخدم');
-  if (!/^[A-Za-z][A-Za-z0-9._@-]{2,63}$/.test(login)) throw new Bad('اسم المستخدم يبدأ بحرف إنجليزي، ثم أحرف أو أرقام أو . _ - (3 أحرف على الأقل)');
-  if (db.prepare('SELECT 1 FROM users WHERE login=?').get(login)) throw new Bad('اسم المستخدم مستخدم من قبل', 409);
+  // اسم المستخدم: الرقم الشخصي (أرقام فقط، ويُطبَّع كما في الدخول) أو اسم بالإنجليزية
+  const raw = str(b.login, 64, 'اسم المستخدم'), login = R.normId(raw) || raw;
+  if (!R.normId(raw) && !/^[A-Za-z][A-Za-z0-9._@-]{2,63}$/.test(login)) throw new Bad('اسم المستخدم: الرقم الشخصي (أرقام فقط)، أو اسم بالإنجليزية يبدأ بحرف');
+  if (db.prepare('SELECT 1 FROM users WHERE login=?').get(login)) throw new Bad('اسم المستخدم مستخدم من قبل (قد يكون حساب متسابق بالرقم نفسه)', 409);
   const pass = auth.tempPassword();
   const id = db.prepare('INSERT INTO users(login,name,phone,email,role,section,specialty,pass_hash,must_change,created_at,created_by) VALUES (?,?,?,?,?,?,?,?,1,?,?)')
     .run(login, f.name, f.phone, f.email, f.role, f.section, f.specialty, auth.hashPassword(pass), Date.now(), req.user.id).lastInsertRowid;
@@ -588,8 +589,8 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 if (seedIfEmpty()) console.log('✓ أُنشئت الدورة المرجعية 2026 (الفروع والفئات والمقررات). عدّلها من «إعداد الدورة».');
 // إنشاء حساب الإدارة العليا تلقائيًا عند أول تشغيل إذا ضُبط ADMIN_PASSWORD (مثل الاستضافة على Render)
 if (!db.prepare("SELECT 1 FROM users WHERE role='top' LIMIT 1").get() && process.env.ADMIN_PASSWORD) {
-  const u = (process.env.ADMIN_USERNAME || 'admin').trim();
-  if (/^[A-Za-z][A-Za-z0-9._@-]{2,63}$/.test(u) && process.env.ADMIN_PASSWORD.length >= 8) {
+  const u0 = (process.env.ADMIN_USERNAME || 'admin').trim(), u = R.normId(u0) || u0;
+  if ((R.normId(u0) || /^[A-Za-z][A-Za-z0-9._@-]{2,63}$/.test(u)) && process.env.ADMIN_PASSWORD.length >= 8) {
     db.prepare("INSERT INTO users(login,name,role,pass_hash,must_change,created_at) VALUES (?,?,'top',?,1,?)").run(u, process.env.ADMIN_NAME || 'الإدارة العليا', auth.hashPassword(process.env.ADMIN_PASSWORD), Date.now());
     console.log(`✓ أُنشئ حساب الإدارة العليا «${u}» (يُطلب تغيير كلمة المرور عند أول دخول).`);
   } else console.warn('⚠  ADMIN_USERNAME أو ADMIN_PASSWORD غير صالح (كلمة المرور 8 أحرف على الأقل).');

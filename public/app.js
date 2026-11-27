@@ -472,7 +472,7 @@ async function vUsers() {
 function userForm(u) {
   const roles = Object.entries(meta.roles).filter(([k]) => k !== 'contestant');
   modal(u ? 'تعديل حساب ' + u.name : 'إضافة حساب', `<form data-form="user" data-id="${u ? u.id : ''}"><p class="err" hidden></p>
-  <div class="row2"><div class="field"><label for="u-login">اسم المستخدم <span class="req">*</span></label><input id="u-login" class="ltr" value="${esc(u ? u.login : '')}" ${u ? 'readonly' : 'required'}><small>بالإنجليزية، يبدأ بحرف، مثل exec.m أو judge.ahmed</small></div>
+  <div class="row2"><div class="field"><label for="u-login">اسم المستخدم <span class="req">*</span></label><input id="u-login" class="ltr" value="${esc(u ? u.login : '')}" ${u ? 'readonly' : 'required'}><small>الرقم الشخصي، أو اسم بالإنجليزية مثل judge.ahmed</small></div>
   <div class="field"><label for="u-name">الاسم <span class="req">*</span></label><input id="u-name" value="${esc(u ? u.name : '')}" required></div></div>
   <div class="row2"><div class="field"><label for="u-r">الدور <span class="req">*</span></label><select id="u-r" required>${opts(roles, u ? u.role : '', 'اختر الدور…')}</select></div>
   <div class="field"><label for="u-section">القسم <span class="req">*</span></label><select id="u-section">${opts(Object.entries(meta.sections), u ? u.section : '', 'القسمان (للإدارة العليا فقط)')}</select></div></div>

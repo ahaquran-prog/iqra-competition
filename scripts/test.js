@@ -44,6 +44,11 @@ function client(base) {
       const c = client(base); await c('POST', '/api/login', { login, password: x.data.tempPassword }); await c('POST', '/api/password', { current: x.data.tempPassword, next: 'Staff-pass-1' });
       return c;
     };
+    r = await admin('POST', '/api/users', { login: '٥٦٨١٢٢٢٣٢', name: 'عبدالله أبوالحسن', role: 'top' });
+    ok('اسم المستخدم يقبل الرقم الشخصي (ويُطبَّع من الأرقام العربية)', r.status === 200 && r.data.user.login === '568122232', r.data);
+    { const cn = client(base); const lr = await cn('POST', '/api/login', { login: '568122232', password: r.data.tempPassword }); ok('الدخول بالرقم الشخصي لحساب الكادر', lr.status === 200 && lr.data.user.role === 'top'); }
+    ok('لا يتكرر الرقم الشخصي في حسابين', (await admin('POST', '/api/users', { login: '568122232', name: 'x', role: 'top' })).status === 409);
+    ok('اسم المستخدم بحروف وأرقام مختلطة غير صالح إن بدأ برقم', (await admin('POST', '/api/users', { login: '12ab', name: 'x', role: 'top' })).status === 400);
     r = await admin('POST', '/api/users', { login: 'execx', name: 'تنفيذي', role: 'exec' });
     ok('رفض حساب تنفيذي بلا قسم', r.status === 400);
     const execM = await mk('exec.m', 'exec', 'M'), execF = await mk('exec.f', 'exec', 'F'), chiefM = await mk('chief.m', 'chief', 'M'), judgeM = await mk('judge.m', 'judge', 'M', 'محكم جودة الحفظ الأول');
