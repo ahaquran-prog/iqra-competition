@@ -428,6 +428,26 @@ function client(base) {
     let d5 = await myD();
     ok('بعد نشر التأهل: القرعة متاحة للمتأهل وإشعار بها', d5 && d5.canDraw && d5.attempts === 0 && (await c5('GET', '/api/notifications')).data.rows.some((n) => n.event === 'draw_open'), d5);
     ok('إشعار القرعة لا يتكرر', (await execM('POST', '/api/admin/draws/notify', { stage: 'semi' })).data.notified === 0);
+    // لا يتكرر المقطع لأكثر من متسابق في المقرر والمرحلة والقسم: مشاركة أخرى من الرجال سحبت ثلاثة مقاطع
+    {
+      const cur5 = db.prepare('SELECT curriculum_id c FROM entries WHERE id=?').get(e5).c;
+      const other = db.prepare("SELECT e.id, e.curriculum_id c FROM entries e JOIN registrations r ON r.id=e.registration_id WHERE r.section='M' AND e.id<>? AND r.comp_id=(SELECT comp_id FROM registrations WHERE id=(SELECT registration_id FROM entries WHERE id=?)) LIMIT 1").get(e5, e5);
+      db.prepare('UPDATE entries SET curriculum_id=? WHERE id=?').run(cur5, other.id);
+      const items = db.prepare("SELECT * FROM passage_bank WHERE curriculum_id=? AND stage='semi' AND active=1 ORDER BY id").all(cur5);
+      items.slice(0, 3).forEach((b, i) => db.prepare('INSERT INTO passage_draws(entry_id,stage,attempt,bank_id,surah,ayah_from,ayah_to,drawn_by,drawn_at) VALUES (?,?,?,?,?,?,?,1,?)').run(other.id, 'semi', i + 1, b.id, b.surah, b.ayah_from, b.ayah_to, Date.now()));
+      d5 = await myD();
+      const cap = (await admin('GET', '/api/admin/bank?stage=semi')).data.curricula.find((c) => c.id === cur5).capacity.find((x) => x.section === 'M');
+      ok('المقاطع التي ظهرت لمتسابق آخر لا تظهر لغيره', d5.left === 1 && cap.taken === 3 && cap.free === 1, { left: d5.left, cap });
+      r = await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 1 });
+      const last = items[3];
+      ok('القرعة تختار من المقاطع التي لم تظهر لأحد فقط', r.status === 200 && r.data.state.current.label.includes(`${last.ayah_from}–${last.ayah_to}`) && !r.data.state.canDraw && r.data.state.left === 0);
+      ok('ومن لم يبقَ له مقطع متاح يعتمد ما ظهر له', r.data.state.canApprove);
+      ok('بنك لا يكفي ثلاث محاولات لكل متأهل يظهر للإدارة', cap.need === 3 * cap.qualified);
+      db.prepare('DELETE FROM passage_draws WHERE entry_id=?').run(other.id);
+      db.prepare('UPDATE entries SET curriculum_id=? WHERE id=?').run(other.c, other.id);
+      await execM('POST', `/api/admin/draws/${e5}/reset`, { stage: 'semi', reason: 'تجربة' });
+      ok('إعادة القرعة تعيد مقاطع المتسابق إلى البنك', (await myD()).left === 4);
+    }
     r = await c5('POST', `/api/my/draws/${e5}/approve`, { stage: 'semi' });
     ok('لا اعتماد قبل السحب', r.status === 409);
     r = await c5('POST', `/api/my/draws/${e5}/draw`, { stage: 'semi', expect: 1 });
