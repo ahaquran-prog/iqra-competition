@@ -660,13 +660,14 @@ async function openForm(ticketId) {
 function fmCalc() {
   const f = S.fm, R = f.rubric, d = f.data, num = (v) => Math.max(0, parseInt(v, 10) || 0);
   if (R.kind === 'segments') {
-    let raw = 0; const g = R.groups.map((gr) => { let ded = 0; for (let i = 0; i < R.segments; i++) for (const it of gr.items) ded += num((d.segments[i] || {})[it.k]) * it.d; const net = Math.max(0, gr.base - ded); raw += net; return { n: gr.n || '', base: gr.base, ded, net }; });
+    let raw = 0; const g = R.groups.map((gr) => { let ded = 0; for (let i = 0; i < R.segments; i++) for (const it of gr.items) ded += num((d.segments[i] || {})[it.k]) * it.d; const min = (gr.floor || 0) * gr.base, net = Math.max(min, gr.base - ded); raw += net; return { n: gr.n || '', base: gr.base, ded, net, min, floored: gr.base - ded < min }; });
     return { raw, base: R.base, groups: g };
   }
-  if (R.kind === 'criteria') { let sum = 0, miss = 0; for (const c of R.criteria) { if (d[c.k] == null || d[c.k] === '') miss++; else sum += +d[c.k]; } const ded = R.deductions.reduce((a, x) => a + num(d.deductions[x.k]), 0); return { raw: Math.max(0, sum - ded), base: R.base, sum, ded, miss }; }
-  const base = R.base[f.track]; let ded = 0;
+  if (R.kind === 'criteria') { let sum = 0, miss = 0; for (const c of R.criteria) { if (d[c.k] == null || d[c.k] === '') miss++; else sum += +d[c.k]; } const ded = R.deductions.reduce((a, x) => a + num(d.deductions[x.k]), 0); const min = (R.floor || 0) * R.base; return { raw: Math.max(min, sum - ded), base: R.base, sum, ded, miss, min, floored: !miss && sum - ded < min }; }
+  const base = ((R.baseByStage || {})[f.stage] || R.base)[f.track]; let ded = 0;
   for (const a of f.passage.ayat) for (const c of R.cols) ded += num((d.rows[a.n] || {})[c.k]) * c.d;
-  return { raw: Math.max(0, base - ded), base, ded };
+  const min = (R.floor || 0) * base;
+  return { raw: Math.max(min, base - ded), base, ded, min, floored: base - ded < min };
 }
 const ctr = (path, v, lock) => `<span class="ctr">${lock ? '' : `<button type="button" class="cbtn" data-act="ctr" data-p="${path}" data-d="-1" aria-label="إنقاص">−</button>`}<input class="cin" inputmode="numeric" data-ctr="${path}" value="${esc(v || 0)}" ${lock ? 'readonly' : ''} aria-label="العدد">${lock ? '' : `<button type="button" class="cbtn" data-act="ctr" data-p="${path}" data-d="1" aria-label="زيادة">+</button>`}</span>`;
 function gradeForm() {
@@ -678,13 +679,13 @@ function gradeForm() {
     body = `<div class="scroll"><table class="grid-form"><thead><tr><th rowspan="2">${esc(R.segLabel || 'المقطع')}</th>${heads.map((h) => `<th colspan="${h.span}">${esc(h.n)}</th>`).join('')}</tr>
       <tr>${items.map((it) => `<th>${esc(it.col || '—')}<small>−${it.d}</small></th>`).join('')}</tr></thead><tbody>
       ${[...Array(R.segments).keys()].map((i) => `<tr><th>${i + 1}</th>${items.map((it) => `<td>${ctr(`s.${i}.${it.k}`, (d.segments[i] || {})[it.k], lock)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-    <div class="calc">${k.groups.map((g) => `<span>${g.n ? esc(g.n) + ': ' : ''}الخصم ${n2(g.ded)} · الصافي <b>${n2(g.net)}</b> من ${g.base}</span>`).join('')}</div>
+    <div class="calc">${k.groups.map((g) => `<span>${g.n ? esc(g.n) + ': ' : ''}الخصم ${n2(g.ded)} · الصافي <b>${n2(g.net)}</b> من ${g.base}${g.min ? ` · الحد الأدنى ${n2(g.min)}${g.floored ? ' (طُبِّق)' : ''}` : ''}</span>`).join('')}</div>
     ${R.extra ? `<div class="field"><span class="lab">${esc(R.extra.n)} <span class="req">*</span></span><div class="acts" role="radiogroup">${R.extra.options.map((o) => `<label class="check opt"><input type="radio" name="fx" data-fx="${R.extra.k}" value="${o}" ${d[R.extra.k] != null && d[R.extra.k] !== '' && +d[R.extra.k] === o ? 'checked' : ''} ${lock ? 'disabled' : ''}>${o}</label>`).join('')}</div><small>تُضاف فوق المجموع.</small></div>` : ''}`;
   } else if (R.kind === 'criteria') {
     body = `<div class="scroll"><table class="list crit"><thead><tr><th>المعيار</th><th class="n">الدرجة المقررة</th><th>الدرجة المستحقة</th><th>المقياس</th></tr></thead><tbody>
       ${R.criteria.map((cr) => `<tr><td><b>${esc(cr.n)}</b>${cr.group ? `<br><small class="note">${esc(cr.group)}</small>` : ''}</td><td class="n">${cr.max}</td><td><select data-fc="${cr.k}" ${lock ? 'disabled' : ''} aria-label="${esc(cr.n)}">${opts(cr.options.map((o) => [o, o]), d[cr.k] ?? '', 'اختر الدرجة')}</select></td><td class="desc">${esc(cr.desc)}</td></tr>`).join('')}</tbody></table></div>
     <h3>موارد خصم الدرجات (درجة لكل مورد)</h3><div class="acts">${R.deductions.map((x) => `<label class="dedl">${esc(x.n)} ${ctr('d.' + x.k, d.deductions[x.k], lock)}</label>`).join('')}</div>
-    <div class="calc"><span>مجموع المعايير ${n2(k.sum)}${k.miss ? ` (${k.miss} بلا اختيار)` : ''}</span><span>الخصم ${k.ded}</span></div>`;
+    <div class="calc"><span>مجموع المعايير ${n2(k.sum)}${k.miss ? ` (${k.miss} بلا اختيار)` : ''}</span><span>الخصم ${k.ded}</span>${k.min ? `<span>الحد الأدنى ${n2(k.min)}${k.floored ? ' (طُبِّق)' : ''}</span>` : ''}</div>`;
   } else {
     const P = f.passage;
     body = `<div class="acts"><button type="button" class="btn sm" data-act="fm-big">${f.big ? 'تصغير الخط' : 'تكبير الخط'}</button><label class="note">انتقال إلى آية <select data-act-jump aria-label="انتقال إلى آية">${P.ayat.map((a) => `<option value="${a.n}">${a.n}</option>`).join('')}</select></label></div>
@@ -693,7 +694,7 @@ function gradeForm() {
       ${P.bismillah ? `<tr class="bsm"><td class="txt quran" colspan="${R.cols.length + 2}">${esc(P.bismillah)}</td></tr>` : ''}
       ${P.ayat.map((a) => `<tr id="ay-${a.n}"><td class="txt quran">${esc(a.text)} <span class="ayn">﴿${a.n}﴾</span></td>${R.cols.map((c2) => `<td>${ctr(`r.${a.n}.${c2.k}`, (d.rows[a.n] || {})[c2.k], lock)}</td>`).join('')}<td><input class="note-in" data-fn="${a.n}" value="${esc((d.rows[a.n] || {}).note || '')}" ${lock ? 'readonly' : ''} aria-label="ملاحظة الآية ${a.n}"></td></tr>`).join('')}</tbody></table></div>
     <p class="note">النص بالرسم العثماني من مشروع تنزيل (tanzil.net).</p>
-    <div class="calc"><span>مجموع الخصم ${n2(k.ded)}</span></div>`;
+    <div class="calc"><span>مجموع الخصم ${n2(k.ded)}</span>${k.min ? `<span>الحد الأدنى ${n2(k.min)}${k.floored ? ' (طُبِّق)' : ''}</span>` : ''}</div>`;
   }
   return `<div class="head"><div><h1>${esc(R.title)}</h1><p>${esc(c.name)} · ${esc(c.category)} · ${esc(c.branchName)}${c.trackName ? ' · ' + esc(c.trackName) : ''} · ${esc(c.stageName)} · ${esc(c.committee)}${f.slot > 1 ? ' · المحكم ' + f.slot : ''}</p></div><div class="acts"><button class="btn" data-act="fm-back">رجوع إلى القائمة</button></div></div>
   <div class="card"><p class="note">المقرر: ${esc(c.curriculum)} — ${esc(R.note)}</p>${!f.mine ? '<div class="banner">هذه الخانة يرصدها محكم آخر في اللجنة.</div>' : ''}${lock ? '<div class="banner info">أُرسل التقييم وأُقفل. لإعادة فتحه تواصل مع رئيس لجنة التحكيم.</div>' : ''}
