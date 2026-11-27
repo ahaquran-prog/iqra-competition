@@ -675,7 +675,7 @@ function gradeForm() {
   if (R.kind === 'segments') {
     const items = R.groups.flatMap((g) => g.items.map((it) => ({ ...it, g: g.n })));
     const heads = []; for (const it of items) { const last = heads[heads.length - 1]; if (last && last.n === it.n) last.span++; else heads.push({ n: it.n, span: 1, col: it.col }); }
-    body = `<div class="scroll"><table class="grid-form"><thead><tr><th rowspan="2">المقطع</th>${heads.map((h) => `<th colspan="${h.span}">${esc(h.n)}</th>`).join('')}</tr>
+    body = `<div class="scroll"><table class="grid-form"><thead><tr><th rowspan="2">${esc(R.segLabel || 'المقطع')}</th>${heads.map((h) => `<th colspan="${h.span}">${esc(h.n)}</th>`).join('')}</tr>
       <tr>${items.map((it) => `<th>${esc(it.col || '—')}<small>−${it.d}</small></th>`).join('')}</tr></thead><tbody>
       ${[...Array(R.segments).keys()].map((i) => `<tr><th>${i + 1}</th>${items.map((it) => `<td>${ctr(`s.${i}.${it.k}`, (d.segments[i] || {})[it.k], lock)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="calc">${k.groups.map((g) => `<span>${g.n ? esc(g.n) + ': ' : ''}الخصم ${n2(g.ded)} · الصافي <b>${n2(g.net)}</b> من ${g.base}</span>`).join('')}</div>
@@ -698,6 +698,7 @@ function gradeForm() {
   return `<div class="head"><div><h1>${esc(R.title)}</h1><p>${esc(c.name)} · ${esc(c.category)} · ${esc(c.branchName)}${c.trackName ? ' · ' + esc(c.trackName) : ''} · ${esc(c.stageName)} · ${esc(c.committee)}${f.slot > 1 ? ' · المحكم ' + f.slot : ''}</p></div><div class="acts"><button class="btn" data-act="fm-back">رجوع إلى القائمة</button></div></div>
   <div class="card"><p class="note">المقرر: ${esc(c.curriculum)} — ${esc(R.note)}</p>${!f.mine ? '<div class="banner">هذه الخانة يرصدها محكم آخر في اللجنة.</div>' : ''}${lock ? '<div class="banner info">أُرسل التقييم وأُقفل. لإعادة فتحه تواصل مع رئيس لجنة التحكيم.</div>' : ''}
   <p class="err" hidden></p>${body}
+  <div class="field"><label for="fm-note">${R.key === 'tilawa_waqf' ? 'التقرير والملاحظات (مواضع الموارد)' : 'ملاحظات المحكم'}</label><textarea id="fm-note" data-fgn maxlength="2000" ${lock ? 'readonly' : ''}>${esc(d.note || '')}</textarea></div>
   <div class="total-bar"><span>درجتك في هذه الاستمارة</span><b>${n2(k.raw)}</b><span>من ${k.base}</span>${R.extra && d[R.extra.k] != null && d[R.extra.k] !== '' ? `<span>· ${esc(R.extra.n)} ${d[R.extra.k]}</span>` : ''}</div>
   ${lock || !f.mine ? '' : `<label class="check"><input type="checkbox" id="fm-ok">راجعت الاستمارة، وأرغب في إرسالها (لا تُعدَّل بعد الإرسال)</label>
   <div class="acts"><button class="btn" data-act="fm-save">حفظ مسودة</button><button class="btn pri" data-act="fm-submit">إرسال التقييم</button>${f.dirty ? '<span class="tag warn">تعديلات غير محفوظة</span>' : f.version ? '<span class="tag ok">محفوظ على الخادم</span>' : ''}</div>`}</div>`;
@@ -1124,6 +1125,7 @@ document.addEventListener('change', (e) => {
   if (['rs-section', 'rs-branch'].includes(t.id)) { S.res[t.id.slice(3)] = t.value; render(); }
   if (t.dataset.fc && S.fm) { S.fm.data[t.dataset.fc] = t.value === '' ? null : +t.value; S.fm.dirty = true; fmPaint(); }
   if (t.dataset.fx && S.fm) { S.fm.data[t.dataset.fx] = +t.value; S.fm.dirty = true; fmPaint(); }
+  if (t.dataset.fgn !== undefined && S.fm) { S.fm.data.note = t.value.slice(0, 2000); S.fm.dirty = true; }
   if (t.dataset.fn && S.fm) { S.fm.data.rows[t.dataset.fn] = S.fm.data.rows[t.dataset.fn] || {}; S.fm.data.rows[t.dataset.fn].note = t.value.slice(0, 300); S.fm.dirty = true; }
   if (t.hasAttribute('data-act-jump')) { const r = document.getElementById('ay-' + t.value); if (r) r.scrollIntoView({ block: 'center' }); }
   if (t.dataset.ctr && S.fm) { const v = Math.max(0, Math.min(999, parseInt(String(t.value).replace(/[٠-٩]/g, (x) => x.charCodeAt(0) - 1632), 10) || 0)); fmSet(t.dataset.ctr, v); fmPaint(); }

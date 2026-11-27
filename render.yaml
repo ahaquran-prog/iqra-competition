@@ -9,7 +9,7 @@ services:
     autoDeploy: true         # كل تعديل يُرفع إلى GitHub يُنشر تلقائيًا
     disk:
       name: iqra-data
-      mountPath: /var/data   # قاعدة البيانات والنسخ الاحتياطية
+      mountPath: /var/data   # قاعدة البيانات والنسخ الاحتياطية وملفات المذكرات
       sizeGB: 5
     envVars:
       - key: DATA_DIR
@@ -30,3 +30,14 @@ services:
         value: الإدارة العليا
       - key: ADMIN_PASSWORD   # يُطلب منك إدخالها عند الإنشاء؛ مؤقتة وتُغيَّر عند أول دخول
         sync: false
+      - key: DEFAULT_COUNTRY_CODE
+        value: "973"
+      - key: DRAW_HOURS        # مهلة قرعة المقاطع بالساعات
+        value: "48"
+      - key: REMINDER_HOURS    # التذكير قبل موعد المرحلة
+        value: "24"
+      - key: MATERIAL_MAX_MB   # أقصى حجم لملف المذكرة
+        value: "25"
+      # قنوات الإشعار الخارجية تُضاف من لوحة Render عند ضبط المزود:
+      # SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS SMTP_FROM
+      # SMS_WEBHOOK_URL SMS_WEBHOOK_TOKEN WHATSAPP_WEBHOOK_URL WHATSAPP_WEBHOOK_TOKEN
