@@ -614,7 +614,7 @@ async function vCommittees() {
   const cov = admin ? (await api('/committees/coverage?stage=' + S.stage + (me.role === 'top' && q.section ? '&section=' + q.section : ''))).sections : [];
   const covBanner = cov.map((x) => {
     const sn = me.role === 'top' ? ` (${esc(x.sectionName)})` : '';
-    return (x.conflicts.length ? `<div class="banner bad"><b>تداخل في اللجان${sn}:</b> لكل مسار في كل فئة لجنة واحدة فقط، وهذه المسارات تشملها أكثر من لجنة فلا يُسجَّل حضور أصحابها تلقائيًا. عدّل فئات إحدى اللجنتين أو مساراتها أو أوقفها:<ul>${x.conflicts.map((k) => `<li>${esc(k.cell)}: ${k.committees.map((n) => '«' + esc(n) + '»').join(' و')}</li>`).join('')}</ul></div>` : '')
+    return (x.conflicts.length ? `<div class="banner bad"><b>لجان يتداخل اختصاصها${sn}:</b> لكل مسار في كل فئة لجنة واحدة، ولا يُسجَّل تلقائيًا حضور من يقع في التداخل. صحّح اختصاص اللجنة من زر «تعديل»: مثلًا لجنة الفئة التي لمقرر الفئة وحده يُختار لها «مقرر الفئة» فقط، ولجنة الأجزاء يُختار لها مساراتها فقط.<ul>${x.conflicts.map((k) => `<li>${k.committees.map((m) => `«${esc(m.name)}» <small>(${esc(m.scope)})</small>`).join(' و')}<br><small>يشتركان في: ${k.cells.map(esc).join('، ')}</small></li>`).join('')}</ul></div>` : '')
       + (x.missing.length ? `<div class="banner warn"><b>مسارات بلا لجنة${sn}:</b> ${x.missing.map(esc).join('، ')}. يُسجَّل حضور أصحابها «بانتظار تحديد اللجنة» حتى تُضاف لجنتها.</div>` : '');
   }).join('');
   const card = (c) => {

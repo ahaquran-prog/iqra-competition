@@ -157,9 +157,9 @@ function client(base) {
     ok('التسجيل يُثبَّت مباشرة دون مراجعة أو قبول', ppl.c1.reg.status === 'accepted' && ppl.c1.reg.statusName === 'مسجّل');
     r = await execM('GET', '/api/committees');
     const hifzY = r.data.committees.find((x) => x.name === 'الحفظ: اليافعون'), tarY = r.data.committees.find((x) => x.name === 'الترتيل: اليافعون');
-    ok('اللجان المبدئية: ست لجان لقسم الرجال', r.data.committees.length === 6 && hifzY && tarY);
+    ok('اللجان المبدئية: سبع لجان لقسم الرجال (لجان الفئات لمقرر الفئة، ولجنة الأجزاء والقرآن)', r.data.committees.length === 7 && hifzY && tarY);
     r = await execF('GET', '/api/committees');
-    ok('تنفيذية النساء ترى لجان قسمها فقط', r.data.committees.length === 6 && r.data.committees.every((x) => x.section === 'F'));
+    ok('تنفيذية النساء ترى لجان قسمها فقط', r.data.committees.length === 7 && r.data.committees.every((x) => x.section === 'F'));
     r = await execM('GET', '/api/reception?q=' + encodeURIComponent('ياسر'));
     ok('ATT01: البحث يجد الاسم أيًّا كان موضعه الأبجدي', r.data.total === 1 && r.data.rows[0].entries[0].candidates.length === 1);
     { const all = (await execM('GET', '/api/reception')).data.total;
@@ -262,7 +262,7 @@ function client(base) {
     r = await ppl.c2.c('GET', '/api/my/queue');
     ok('المتسابق يرى حالته ولجنته وعدد من قبله', r.data.tickets[0].status === 'waiting' && r.data.tickets[0].committee === 'الحفظ: اليافعون' && r.data.tickets[0].ahead === 0);
     r = await execM('POST', '/api/committees', { name: 'الحفظ: اليافعون 2', branch: 'hifz', categories: [hifzY.categories[0]], hall: 'القاعة 7' });
-    ok('لكل مسار في كل فئة لجنة واحدة: رفض لجنة ثانية تشمل مسارات اليافعون في الحفظ', r.status === 409 && r.data.error.includes('الحفظ: اليافعون') && r.data.error.includes('اليافعون ·'), r.data);
+    ok('لكل مسار في كل فئة لجنة واحدة: رفض لجنة ثانية تشمل مسارات اليافعون في الحفظ', r.status === 409 && r.data.error.includes('اليافعون · مقرر الفئة') && r.data.error.includes('«الحفظ: اليافعون»'), r.data);
     r = await execM('POST', '/api/committees', { name: 'الحفظ: اليافعون خمسة أجزاء', branch: 'hifz', tracks: ['j5'], categories: [], hall: 'القاعة 7' });
     ok('رفض لجنة لمسار واحد لكل الفئات وهو من اختصاص لجان قائمة', r.status === 409);
     { const tadw = (await execM('GET', '/api/committees')).data.committees.find((k) => k.name === 'التدوير: جميع الفئات');
@@ -272,7 +272,7 @@ function client(base) {
     const extraId = db.prepare("INSERT INTO committees(comp_id,section,stage,name,branch,tracks,categories,hall,sort,created_at) SELECT comp_id,section,stage,'الحفظ: اليافعون 2',branch,tracks,categories,'القاعة 7',50,1 FROM committees WHERE id=?").run(hifzY.id).lastInsertRowid;
     const extra = (await execM('GET', '/api/committees')).data.committees.find((k) => k.id === extraId);
     r = await execM('GET', '/api/committees/coverage');
-    ok('صفحة اللجان تكشف التداخل القائم باسم المسار واللجنتين', r.status === 200 && r.data.sections.length === 1 && r.data.sections[0].conflicts.some((k) => k.cell.startsWith('اليافعون') && k.committees.includes('الحفظ: اليافعون 2')), r.data);
+    ok('صفحة اللجان تكشف التداخل القائم باسم المسار واللجنتين', r.status === 200 && r.data.sections.length === 1 && r.data.sections[0].conflicts.some((k) => k.cells.includes('اليافعون · مقرر الفئة') && k.committees.some((m) => m.name === 'الحفظ: اليافعون 2' && m.scope === 'مقرر الفئة · اليافعون')), r.data);
     ok('ولا مسارات بلا لجنة في الإعداد المرجعي', r.data.sections[0].missing.length === 0, r.data.sections[0].missing);
     ok('التغطية للإدارة فقط', (await judgeM('GET', '/api/committees/coverage')).status === 403);
     // رمز QR للحضور: المتسابق يعرضه، والإدارة التنفيذية تمسحه فيُسجَّل حضوره
