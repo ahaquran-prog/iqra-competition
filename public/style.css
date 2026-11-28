@@ -138,6 +138,7 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;accen
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .filters>*{flex:1 1 150px;width:auto}
 .filters input[type=search]{flex:2 1 240px}
+.filters #rf-track{flex:1.6 1 210px}
 .scroll{overflow-x:auto}
 table.list{width:100%;border-collapse:collapse;font-size:15px}
 table.list th{font-size:13px;color:var(--mute);font-weight:600;text-align:start;padding:10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}

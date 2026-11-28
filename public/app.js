@@ -529,8 +529,18 @@ const stageBar = () => `<div class="stagebar" role="group" aria-label="المر�
 // ---------- الاستقبال وتسجيل الحضور ----------
 const TK = { waiting: 'info', needs_committee: 'warn', called: 'warn', testing: 'plum', done: 'ok', no_show: 'bad', cancelled: '' };
 const tTag = (t) => `<span class="tag ${TK[t.status] || ''}">${t.seq ? '#' + t.seq + ' · ' : ''}${esc(t.statusName)}${t.committee ? ' · ' + esc(t.committee) : ''}</span>`;
+// المسارات للتصفية: الفرع · المسار، مقصورة على مسارات الفئة المختارة إن وُجدت (البحث لا حضور له)
+function trackOpts(cat) {
+  const bn = Object.fromEntries((pub.branches || []).map((b) => [b.code, b.name])), seen = new Map();
+  for (const x of pub.curricula || []) {
+    if (x.branch === 'research' || (cat && x.categoryId != null && String(x.categoryId) !== String(cat))) continue;
+    const k = x.branch + ':' + x.track;
+    if (!seen.has(k)) seen.set(k, (bn[x.branch] || x.branch) + (x.trackName ? ' · ' + x.trackName : ''));
+  }
+  return [...seen];
+}
 async function vReception() {
-  const f = S.rec = S.rec || { q: '', section: '', category: '', state: '', page: 1 };
+  const f = S.rec = S.rec || { q: '', section: '', category: '', track: '', state: '', page: 1 };
   const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
   const d = S.recData = await api('/reception?' + qs + '&stage=' + S.stage);
   const c = d.counts, pages = Math.max(1, Math.ceil(d.total / d.pageSize));
@@ -548,6 +558,7 @@ async function vReception() {
   <div class="card"><form class="filters" data-form="recf" role="search"><input type="search" id="rf-q" value="${esc(f.q)}" placeholder="ابحث بالاسم أو الهوية أو الهاتف" aria-label="بحث" autofocus>
     ${me.role === 'top' ? `<select id="rf-section" aria-label="القسم">${opts(Object.entries(meta.sections), f.section, 'القسمان')}</select>` : ''}
     <select id="rf-category" aria-label="الفئة">${opts(pub.categories.map((x) => [x.id, x.name]), f.category, 'كل الفئات')}</select>
+    <select id="rf-track" aria-label="المسار">${opts(trackOpts(f.category), f.track, 'كل المسارات')}</select>
     <select id="rf-state" aria-label="الحضور">${opts([...(S.stage === 'prelim' ? [['today', 'موزّعون على اليوم']] : []), ['absent', 'لم يحضروا'], ['present', 'حاضرون']], f.state, 'الجميع')}</select><button class="btn pri" type="submit">بحث</button></form>
   <p class="note">${d.total} مسجّلًا</p>
   ${d.rows.length ? `<div class="scroll"><table class="list stack"><thead><tr><th>الاسم</th><th>الفئة</th><th>المشاركات والحضور</th><th></th></tr></thead><tbody>${d.rows.map(row).join('')}</tbody></table></div>
@@ -1309,7 +1320,11 @@ document.addEventListener('change', (e) => {
   if (t.dataset.fn && S.fm) { S.fm.data.rows[t.dataset.fn] = S.fm.data.rows[t.dataset.fn] || {}; S.fm.data.rows[t.dataset.fn].note = t.value.slice(0, 300); S.fm.dirty = true; }
   if (t.hasAttribute('data-act-jump')) { const r = document.getElementById('ay-' + t.value); if (r) r.scrollIntoView({ block: 'center' }); }
   if (t.dataset.ctr && S.fm) { const v = Math.max(0, Math.min(999, parseInt(String(t.value).replace(/[٠-٩]/g, (x) => x.charCodeAt(0) - 1632), 10) || 0)); fmSet(t.dataset.ctr, v); fmPaint(); }
-  if (['rf-section', 'rf-category', 'rf-state'].includes(t.id)) { S.rec[t.id.slice(3)] = t.value; S.rec.page = 1; render(); }
+  if (['rf-section', 'rf-category', 'rf-track', 'rf-state'].includes(t.id)) {
+    S.rec[t.id.slice(3)] = t.value; S.rec.page = 1;
+    if (t.id === 'rf-category' && S.rec.track && !trackOpts(t.value).some(([k]) => k === S.rec.track)) S.rec.track = ''; // مسار لا يخص الفئة الجديدة
+    render();
+  }
   if (t.id === 'k-b') $('#k-scope').innerHTML = scopeBoxes(t.value, null);
   if (['f-section', 'f-category', 'f-branch', 'f-status'].includes(t.id)) { S.regs[t.id.slice(2)] = t.value; S.regs.page = 1; render(); }
   const k = t.dataset.wz; if (!k || !S.wz) return;

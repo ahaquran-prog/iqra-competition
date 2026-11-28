@@ -162,6 +162,15 @@ function client(base) {
     ok('تنفيذية النساء ترى لجان قسمها فقط', r.data.committees.length === 6 && r.data.committees.every((x) => x.section === 'F'));
     r = await execM('GET', '/api/reception?q=' + encodeURIComponent('ياسر'));
     ok('ATT01: البحث يجد الاسم أيًّا كان موضعه الأبجدي', r.data.total === 1 && r.data.rows[0].entries[0].candidates.length === 1);
+    { const all = (await execM('GET', '/api/reception')).data.total;
+      const pairs = db.prepare("SELECT DISTINCT e.branch, e.track FROM entries e JOIN registrations r ON r.id=e.registration_id WHERE r.section='M' AND r.status='accepted' AND e.status='active'").all();
+      let good = pairs.length > 1, sum = 0;
+      for (const x of pairs) {
+        const t = (await execM('GET', `/api/reception?track=${x.branch}:${x.track}`)).data;
+        const want = db.prepare("SELECT COUNT(DISTINCT r.id) n FROM entries e JOIN registrations r ON r.id=e.registration_id WHERE r.section='M' AND r.status='accepted' AND e.status='active' AND e.branch=? AND e.track=?").get(x.branch, x.track).n;
+        if (t.total !== want || !t.rows.every((row) => row.entries.length)) good = false; sum += t.total;
+      }
+      ok('تصفية الاستقبال بالمسار تعطي من سجّلوا فيه فقط', good && sum >= all, pairs); }
 
     console.log('توزيع المتسابقين على أيام التصفيات');
     r = await execM('GET', '/api/days');
