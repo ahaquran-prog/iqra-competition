@@ -146,7 +146,7 @@ function vHome() {
     <div class="hero-brand"><span class="emb">${LOGO}</span>${wordmark(c, true)}</div>
     <h1 class="sr">${esc(c.name)}، الدورة ${esc(c.number)} · ${esc(c.year)}</h1>
     <div class="facts"><span><b>حالة التسجيل</b>${esc(c.state.label)}</span><span><b>فتح التسجيل</b>${esc(dateLabel(c.regOpen))}</span><span><b>إغلاق التسجيل</b>${esc(dateLabel(c.regClose))}</span></div>
-    <div class="acts">${!me ? `${c.state.open ? '<a class="btn gold" href="#signup">بدء التسجيل</a>' : ''}<a class="btn ghost" href="#login">تسجيل الدخول</a>` : `<a class="btn gold" href="#${homeOf()}">مساحة العمل</a>`}</div></div>
+    <div class="acts">${!me ? `${c.state.open ? '<a class="btn gold" href="#signup">بدء التسجيل</a>' : ''}<a class="btn ghost" href="#login">تسجيل الدخول</a>` : `<a class="btn gold" href="#${homeOf()}">${esc(navFor()[0][1])}</a>`}</div></div>
     <figure class="quote"><blockquote>«أشرافُ أمتي حملةُ القرآن»</blockquote><p class="motto">احفظ بوعي… ورتّل بتدبّر</p></figure></div></section>
   <h2 class="sec-title">الفئات العمرية</h2>
   <p class="note">تُحدَّد الفئة تلقائيًا من سنة الميلاد، ولا يختارها المتسابق.</p>
