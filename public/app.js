@@ -650,20 +650,28 @@ function scopeBoxes(br, c) {
 }
 
 // ---------- شاشة قاعة الانتظار ----------
-const SCR = { last: 0, first: true, sound: false, section: 'M' };
+const SCR = { last: 0, first: true, sound: false, section: 'M', ctl: false, sec: 'M', voices: {} };
+// تفضيلات جهاز الشاشة: الصوت المختار لكل قسم (تُحفظ في المتصفح)
+try { SCR.voices = JSON.parse(localStorage.getItem('iqraScrVoices') || '{}'); } catch (e) {}
 async function vScreen() {
   const d = await api('/screen?since=' + SCR.last + '&stage=' + S.stage + (me.role === 'top' ? '&section=' + SCR.section : ''));
+  SCR.sec = d.section;
   const fresh = SCR.first ? [] : d.calls.filter((c) => c.fresh).reverse();
   SCR.first = false; SCR.last = d.lastId;
   if (fresh.length) announce(fresh);
-  startPoll(2000, repaint);
+  startPoll(2000, () => { const f = document.activeElement; if (SCR.ctl && f && f.tagName === 'SELECT' && f.closest('.scr-ctl')) return; repaint(); }); // لا يُغلق قائمة يستعملها المشغّل
   const top = d.calls[0];
   const nk = d.committees.length, kc = nk <= 3 ? 'k3' : nk <= 6 ? 'k6' : nk <= 8 ? 'k8' : nk <= 12 ? 'k12' : 'k16';
   const ln = top ? (top.name.length > 34 ? ' long2' : top.name.length > 24 ? ' long' : '') : '';
   return `<div class="scr-wrap"><div class="scr"><header class="scr-top"><div class="brandline"><span class="emb">${LOGO}</span>${wordmark(pub && pub.competition)}<span class="ctx">${esc(d.stageName)} · ${esc(d.sectionName)}</span></div>
-    <div class="acts"><span class="clock">${new Date().toLocaleTimeString('ar-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}</span>
+    <div class="acts"><span class="clock">${new Date().toLocaleTimeString('ar-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}</span></div></header>
+  <div class="scr-ctl${SCR.ctl ? ' on' : ''}" role="toolbar" aria-label="أدوات تشغيل الشاشة">
     ${me.role === 'top' ? `<button class="btn sm ghost" data-act="ssec">${SCR.section === 'M' ? 'عرض قسم النساء' : 'عرض قسم الرجال'}</button>` : ''}
-    <select class="scr-stage" id="scr-stage" aria-label="المرحلة">${opts(STG, S.stage)}</select><button class="btn sm ${SCR.sound ? 'gold' : 'ghost'}" data-act="sound">${SCR.sound ? 'الصوت مفعّل' : 'تفعيل الصوت'}</button><button class="btn sm ghost" data-act="fs">ملء الشاشة</button>${me.role !== 'screen' ? `<a class="btn sm ghost" href="#${homeOf()}">خروج من الشاشة</a>` : ''}</div></header>
+    <select class="scr-stage" id="scr-stage" aria-label="المرحلة">${opts(STG, S.stage)}</select>
+    <button class="btn sm ${SCR.sound ? 'gold' : 'ghost'}" data-act="sound">${SCR.sound ? 'النداء الصوتي مفعّل' : 'تفعيل النداء الصوتي'}</button>
+    <select class="scr-stage" id="scr-voice" aria-label="صوت النداء">${voiceOpts(d.section)}</select><button class="btn sm ghost" data-act="voice-test">تجربة الصوت</button>
+    <button class="btn sm ghost" data-act="fs">ملء الشاشة</button>${me.role !== 'screen' ? `<a class="btn sm ghost" href="#${homeOf()}">خروج من الشاشة</a>` : ''}
+    <small>تختفي هذه الأدوات تلقائيًا ولا يراها الحضور. حرّك الفأرة أو اضغط أي مفتاح لإظهارها.</small></div>
   <section class="scr-now${ln} ${top && top.fresh ? 'flash' : ''}">${top ? `<p class="lbl">${top.kind === 'recall' ? 'نداء متكرر' : 'النداء الحالي'}</p><h1>${esc(top.name)}</h1><p class="to">يتوجه إلى <b>${esc(top.committee)}</b>${top.hall ? ` · <b>${esc(top.hall)}</b>` : ''}</p>` : '<p class="lbl">قاعة الانتظار</p><h1>أهلًا بكم</h1><p class="to">ستظهر هنا أسماء المتسابقين عند نداء لجانهم</p>'}</section>
   <div class="scr-body"><div class="scr-grid ${kc}">${d.committees.map((k) => `<div class="scr-c ${k.current ? 's-' + k.current.status : ''}"><span class="scr-h">${esc(k.name)}<small>${esc(k.hall)}</small></span><b>${k.current ? esc(k.current.name) : '—'}</b><span class="scr-st">${k.current ? esc(k.current.statusName) : 'بانتظار النداء'} · منتظر ${k.waiting}</span></div>`).join('')}</div>
   <aside class="scr-log"><h2>آخر النداءات</h2><ol>${d.calls.slice(0, 5).map((c) => `<li><b>${esc(c.name)}</b><span>${esc(c.committee)}${c.hall ? ' · ' + esc(c.hall) : ''}</span></li>`).join('') || '<li>لا نداءات بعد</li>'}</ol></aside></div></div></div>`;
@@ -672,16 +680,51 @@ async function vScreen() {
 function fitScreen() { document.documentElement.style.setProperty('--scr-s', String(Math.min(window.innerWidth / 1920, window.innerHeight / 1080))); }
 window.addEventListener('resize', fitScreen); document.addEventListener('fullscreenchange', () => setTimeout(fitScreen, 60));
 function chime() { try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.setValueAtTime(0.2, a.currentTime); g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.9); o.start(); o.stop(a.currentTime + 0.9); } catch (e) {} }
+// النداء الصوتي: صوت رجالي في قسم الرجال وصوت نسائي في قسم النساء، من الأصوات العربية المثبتة في الجهاز.
+// أسماء الأصوات الشائعة (ويندوز وإيدج وماك وأندرويد) لتمييز الرجالي من النسائي، ويمكن اختيار الصوت يدويًا ويُحفظ لكل قسم
+const MALE_V = /(naayf|hamed|ali\b|shakir|taim|bassel|omar|fahed|hamdan|jamal|moaz|rami|saleh|tarek|tarik|maged|majed|hamid|mansour|male|ذكر|رجل)/i;
+const FEMALE_V = /(hoda|zariyah|laila|layla|amany|amina|fatima|noura|salma|sana|rana|mouna|iman|reem|mariam|amira|hala|sameera|female|أنثى|امرأة)/i;
+const arVoices = () => { try { return speechSynthesis.getVoices().filter((v) => /^ar/i.test(v.lang)); } catch (e) { return []; } };
+function pickVoice(sec) {
+  const all = arVoices(); if (!all.length) return null;
+  const saved = SCR.voices[sec], hit = saved && all.find((v) => v.name === saved); if (hit) return hit;
+  const want = sec === 'F' ? FEMALE_V : MALE_V, bh = (v) => /-BH|Bahrain/i.test(v.lang + v.name) ? 2 : /natural|online/i.test(v.name) ? 1 : 0;
+  return all.filter((v) => want.test(v.name)).sort((x, y) => bh(y) - bh(x))[0] || null;
+}
+function voiceOpts(sec) {
+  const all = arVoices(), cur = pickVoice(sec);
+  if (!all.length) return '<option value="">لا يوجد صوت عربي في هذا الجهاز</option>';
+  return `<option value="">${cur ? 'تلقائي: ' + esc(cur.name) : `تلقائي (لم يُعثر على صوت ${sec === 'F' ? 'نسائي' : 'رجالي'})`}</option>` + all.map((v) => `<option value="${esc(v.name)}" ${SCR.voices[sec] === v.name ? 'selected' : ''}>${esc(v.name)}</option>`).join('');
+}
+try { speechSynthesis.onvoiceschanged = () => { if (view === 'screen') repaint(); }; } catch (e) {}
+function say(text, sec) {
+  const u = new SpeechSynthesisUtterance(text), v = pickVoice(sec);
+  u.lang = v ? v.lang : 'ar-BH'; if (v) u.voice = v; u.rate = 0.85; u.pitch = 1; speechSynthesis.speak(u);
+}
+function callText(c, sec) {
+  const who = sec === 'F' ? 'المتسابقة' : 'المتسابق';
+  const where = `${c.committee}${c.hall ? '، ' + c.hall : ''}`;
+  return `${c.kind === 'recall' ? 'نداء متكرر. ' : ''}${who} ${c.name}. يرجى التوجه إلى ${where}. ${who} ${c.name}.`;
+}
 function announce(list) {
   if (!SCR.sound) return;
   chime();
   if (!('speechSynthesis' in window)) return;
-  const voice = speechSynthesis.getVoices().find((v) => /^ar/i.test(v.lang));
-  for (const c of list) {
-    const u = new SpeechSynthesisUtterance(`${c.kind === 'recall' ? 'نداء متكرر. ' : ''}المتسابق ${c.name}، يرجى التوجه إلى ${c.committee}${c.hall ? '، ' + c.hall : ''}`);
-    u.lang = 'ar'; if (voice) u.voice = voice; u.rate = 0.9; speechSynthesis.speak(u);
-  }
+  setTimeout(() => { for (const c of list) say(callText(c, SCR.sec), SCR.sec); }, 700); // بعد التنبيه
 }
+// إظهار أدوات الشاشة للمشغّل عند تحريك الفأرة أو الضغط على مفتاح، وإخفاؤها بعد ثوانٍ (ويختفي المؤشر)
+let ctlTimer = null;
+function showCtl() {
+  if (view !== 'screen') return;
+  SCR.ctl = true; const el = $('.scr-ctl'), w = $('.scr-wrap'); if (el) el.classList.add('on'); if (w) w.classList.remove('idle');
+  clearTimeout(ctlTimer);
+  ctlTimer = setTimeout(() => {
+    const el2 = $('.scr-ctl'); if (el2 && el2.matches(':hover')) return showCtl();
+    if (el2 && el2.contains(document.activeElement)) document.activeElement.blur();
+    SCR.ctl = false; if (el2) el2.classList.remove('on'); const w2 = $('.scr-wrap'); if (w2) w2.classList.add('idle');
+  }, 4000);
+}
+['mousemove', 'keydown', 'touchstart', 'mousedown'].forEach((ev) => document.addEventListener(ev, showCtl, { passive: true }));
 
 // ---------- الرصد (المحكم) ----------
 const n2 = (x) => (x == null ? '—' : (Math.round(x * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }));
@@ -1287,6 +1330,7 @@ document.addEventListener('click', async (e) => {
     else if (a === 'cm-del') { await api('/committees/' + id, { method: 'DELETE' }); closeModal(); toast('حُذفت اللجنة'); render(); }
     // الشاشة
     else if (a === 'sound') { SCR.sound = !SCR.sound; if (SCR.sound) { chime(); try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch (e) {} } repaint(); }
+    else if (a === 'voice-test') { if (!('speechSynthesis' in window) || !arVoices().length) return toast('لا يوجد صوت عربي في هذا الجهاز. استخدم متصفح Microsoft Edge على ويندوز.'); chime(); setTimeout(() => say(callText({ name: SCR.sec === 'F' ? 'فاطمة علي حسن' : 'محمد علي حسن', committee: 'لجنة الحفظ', hall: 'القاعة الأولى' }, SCR.sec), SCR.sec), 700); }
     else if (a === 'fs') { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch (e) { toast('ملء الشاشة غير متاح هنا؛ استخدم F11'); } }
     else if (a === 'ssec') { SCR.section = SCR.section === 'M' ? 'F' : 'M'; SCR.first = true; SCR.last = 0; repaint(); }
     else if (a === 'asec') { Object.assign(S.audit, { section: b.dataset.s, page: 1 }); render(); }
@@ -1317,6 +1361,7 @@ document.addEventListener('change', (e) => {
       .catch((err) => { if (sv) { sv.textContent = 'لم يُحفظ: ' + err.message; sv.classList.add('bad'); } });
   }
   if (t.id === 'nq-st') { S.nq.status = t.value; S.nq.page = 1; render(); }
+  if (t.id === 'scr-voice') { if (t.value) SCR.voices[SCR.sec] = t.value; else delete SCR.voices[SCR.sec]; try { localStorage.setItem('iqraScrVoices', JSON.stringify(SCR.voices)); } catch (e) {} repaint(); return; }
   if (t.id === 'scr-stage') { S.stage = t.value; SCR.first = true; SCR.last = 0; repaint(); }
   if (t.dataset.qd && S.qprev) { const r = S.qprev.rows.find((x) => x.entryId === +t.dataset.qd); const box = $('#qrw-' + t.dataset.qd); if (box) box.hidden = !(r.tieAtCut || t.checked !== r.proposed); }
   if (['rs-section', 'rs-branch'].includes(t.id)) { S.res[t.id.slice(3)] = t.value; render(); }

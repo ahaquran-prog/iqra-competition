@@ -454,3 +454,11 @@ tr.top10 td{background:rgba(197,155,85,.09)}tr.top10 td:first-child{box-shadow:i
 .hero-brand .emb{height:clamp(96px,11.5vw,140px)}
 .scr-top .wm{font-size:25px}.scr-top .wm span{opacity:1}
 @media(max-width:640px){.logo .wm{font-size:13px}.hero-brand .wm{font-size:24px}.hero-brand .emb{height:84px}}
+/* أدوات تشغيل الشاشة: مخفية عن الحضور، تظهر للمشغّل عند تحريك الفأرة أو الضغط على مفتاح */
+.scr-ctl{position:absolute;top:128px;inset-inline:40px;z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 18px;border-radius:14px;
+  background:rgba(20,10,32,.92);border:1px solid rgba(231,222,210,.25);box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .25s}
+.scr-ctl.on{opacity:1;pointer-events:auto}
+.scr-ctl .btn.sm,.scr-ctl .scr-stage{font-size:16px;min-height:40px}
+.scr-ctl #scr-voice{max-width:420px}
+.scr-ctl small{color:var(--sand);opacity:.75;font-size:14px;flex-basis:100%}
+.scr-wrap.idle{cursor:none}
