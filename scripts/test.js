@@ -11,7 +11,7 @@ process.env.ADMIN_USERNAME = 'admin';
 const app = require('../server');
 const db = require('../lib/db');
 
-let pass = 0, fail = 0, S_ded = 0;
+let pass = 0, fail = 0;
 const ok = (name, cond, extra) => { if (cond) { pass++; console.log('  ✓ ' + name); } else { fail++; console.log('  ✗ ' + name, extra !== undefined ? JSON.stringify(extra) : ''); } };
 
 function client(base) {
@@ -262,8 +262,19 @@ function client(base) {
     r = await ppl.c2.c('GET', '/api/my/queue');
     ok('المتسابق يرى حالته ولجنته وعدد من قبله', r.data.tickets[0].status === 'waiting' && r.data.tickets[0].committee === 'الحفظ: اليافعون' && r.data.tickets[0].ahead === 0);
     r = await execM('POST', '/api/committees', { name: 'الحفظ: اليافعون 2', branch: 'hifz', categories: [hifzY.categories[0]], hall: 'القاعة 7' });
-    ok('إنشاء لجنة إضافية في القسم', r.status === 200 && r.data.committee.section === 'M');
-    const extra = r.data.committee;
+    ok('لكل مسار في كل فئة لجنة واحدة: رفض لجنة ثانية تشمل مسارات اليافعون في الحفظ', r.status === 409 && r.data.error.includes('الحفظ: اليافعون') && r.data.error.includes('اليافعون ·'), r.data);
+    r = await execM('POST', '/api/committees', { name: 'الحفظ: اليافعون خمسة أجزاء', branch: 'hifz', tracks: ['j5'], categories: [], hall: 'القاعة 7' });
+    ok('رفض لجنة لمسار واحد لكل الفئات وهو من اختصاص لجان قائمة', r.status === 409);
+    { const tadw = (await execM('GET', '/api/committees')).data.committees.find((k) => k.name === 'التدوير: جميع الفئات');
+      r = await execM('PUT', `/api/committees/${tadw.id}`, { ...tadw, tracks: ['tadweer', 'tartil'] });
+      ok('رفض تعديل لجنة بما يتداخل مع لجنة أخرى', r.status === 409 && r.data.error.includes('الترتيل')); }
+    // بيانات سابقة متداخلة (قبل منع التداخل): لا يُسند الحاضر تلقائيًا، وتُعرض في صفحة اللجان
+    const extraId = db.prepare("INSERT INTO committees(comp_id,section,stage,name,branch,tracks,categories,hall,sort,created_at) SELECT comp_id,section,stage,'الحفظ: اليافعون 2',branch,tracks,categories,'القاعة 7',50,1 FROM committees WHERE id=?").run(hifzY.id).lastInsertRowid;
+    const extra = (await execM('GET', '/api/committees')).data.committees.find((k) => k.id === extraId);
+    r = await execM('GET', '/api/committees/coverage');
+    ok('صفحة اللجان تكشف التداخل القائم باسم المسار واللجنتين', r.status === 200 && r.data.sections.length === 1 && r.data.sections[0].conflicts.some((k) => k.cell.startsWith('اليافعون') && k.committees.includes('الحفظ: اليافعون 2')), r.data);
+    ok('ولا مسارات بلا لجنة في الإعداد المرجعي', r.data.sections[0].missing.length === 0, r.data.sections[0].missing);
+    ok('التغطية للإدارة فقط', (await judgeM('GET', '/api/committees/coverage')).status === 403);
     // رمز QR للحضور: المتسابق يعرضه، والإدارة التنفيذية تمسحه فيُسجَّل حضوره
     r = await ppl.c4.c('GET', '/api/my/qr');
     const qr4 = r.data.qr;
@@ -282,14 +293,12 @@ function client(base) {
     ok('المسح المكرر لا ينشئ حضورًا جديدًا', r.data.already && r.data.tickets[0].seq === seq4);
     ok('تسجيل الحضور بالرمز في سجل التدقيق', db.prepare("SELECT 1 FROM audit WHERE action='checkin' AND summary LIKE '%بمسح رمز QR%'").get());
     r = await ci('c4', [0]);
-    const t4 = r.data.tickets[0];
-    ok('عند وجود أكثر من لجنة مطابقة: يُسجَّل تلقائيًا دون اختيار، في الأقل انتظارًا عند تساوي التخصص', t4.status === 'waiting' && [hifzY.id, extra.id].includes(t4.committeeId), t4);
-    r = await chiefM('POST', `/api/tickets/${t4.id}/assign`, { committeeId: tarY.id });
+    ok('مع تداخل لجنتين (بيانات سابقة): لا تخمين، بانتظار تحديد اللجنة', r.data.tickets[0].status === 'needs_committee');
+    r = await chiefM('POST', `/api/tickets/${r.data.tickets[0].id}/assign`, { committeeId: tarY.id });
     ok('رفض إسناد إلى لجنة لا تطابق الفرع', r.status === 400);
-    const other = t4.committeeId === extra.id ? hifzY.id : extra.id;
-    r = await chiefM('POST', `/api/tickets/${t4.id}/assign`, { committeeId: other });
-    ok('نقل المتسابق إلى لجنة أخرى مطابقة مع الحفاظ على رقم الوصول', r.status === 200 && r.data.ticket.status === 'waiting' && r.data.ticket.committeeId === other && r.data.ticket.seq === t4.seq);
-    if (other !== extra.id) await chiefM('POST', `/api/tickets/${t4.id}/assign`, { committeeId: extra.id }); // تبقى في اللجنة الإضافية لما بعدها
+    const t4 = (await execM('GET', '/api/queues')).data.needsCommittee[0];
+    r = await chiefM('POST', `/api/tickets/${t4.id}/assign`, { committeeId: extra.id });
+    ok('إسناد اللجنة مع الحفاظ على رقم الوصول', r.status === 200 && r.data.ticket.status === 'waiting' && r.data.ticket.seq === t4.seq);
     r = await execM('PUT', `/api/committees/${hifzY.id}`, { ...hifzY, branch: 'tilawa', tracks: ['tartil'] });
     ok('لا يُغيَّر اختصاص لجنة بعد بدء الحضور فيها', r.status === 409);
     r = await execM('DELETE', `/api/committees/${hifzY.id}`);
@@ -877,20 +886,18 @@ function client(base) {
       ok('تنزيل حسابات التجربة Excel', xl.status === 200 && require('../lib/xlsx').read(xl.data).length === r.data.people + 1);
       const tEnt = db.prepare("SELECT e.id, r.id rid, r.person_id FROM entries e JOIN registrations r ON r.id=e.registration_id JOIN people p ON p.id=r.person_id WHERE p.is_test=1 LIMIT 1").get();
       db.prepare("INSERT INTO tickets(comp_id,entry_id,registration_id,person_id,section,stage,status,seq,arrived_at,updated_at) SELECT ?,?,?,?, 'M','prelim','waiting',9999,1,1").run(cmp.id, tEnt.id, tEnt.rid, tEnt.person_id);
-      { // لجنتان تشملان البراعم: العامة (البراعم والناشئة) ولجنة مخصصة للبراعم. يُسجَّل تلقائيًا في المخصصة دون اختيار
+      { // البراعم · مقرر الفئة في قسم النساء من اختصاص لجنة واحدة: يُسجَّل فيها مباشرة، ولا تُقبل لجنة ثانية له
         const bar = db.prepare("SELECT id FROM categories WHERE comp_id=? AND name='البراعم'").get(cmp.id).id;
-        const ded = db.prepare("INSERT INTO committees(comp_id,section,stage,name,branch,tracks,categories,hall,sort,created_at) VALUES (?, 'F','prelim','الحفظ: البراعم مقرر الفئة','hifz','[\"cat\"]',?,'ق9',99,1)").run(cmp.id, JSON.stringify([bar])).lastInsertRowid;
-        const z = db.prepare("SELECT r.id rid, e.id eid FROM registrations r JOIN people p ON p.id=r.person_id JOIN entries e ON e.registration_id=r.id WHERE p.is_test=1 AND r.section='F' AND r.category_id=? AND e.branch='hifz' AND e.status='active' LIMIT 1").get(bar);
-        const rc = (await admin('GET', '/api/reception?section=F&track=hifz:cat&category=' + bar)).data.rows.find((x) => x.id === z.rid);
-        ok('لجنة الفئة والمقرر المخصصة تأتي أولًا بين اللجان المطابقة', rc && rc.entries.find((e) => e.id === z.eid).candidates[0].id === ded && rc.entries.find((e) => e.id === z.eid).candidates.length >= 2);
+        const own = db.prepare("SELECT id FROM committees WHERE comp_id=? AND section='F' AND stage='prelim' AND name='الحفظ: البراعم والناشئة'").get(cmp.id).id;
+        const dup = await admin('POST', '/api/committees', { section: 'F', name: 'الحفظ: البراعم مقرر الفئة', branch: 'hifz', tracks: ['cat'], categories: [bar], hall: 'ق9' });
+        ok('لا تُنشأ لجنة ثانية لمسار البراعم · مقرر الفئة', dup.status === 409 && dup.data.error.includes('البراعم · ') && dup.data.error.includes('الحفظ: البراعم والناشئة'), dup.data);
+        const z = db.prepare("SELECT r.id rid, e.id eid FROM registrations r JOIN people p ON p.id=r.person_id JOIN entries e ON e.registration_id=r.id WHERE p.is_test=1 AND r.section='F' AND r.category_id=? AND e.branch='hifz' AND e.track='cat' AND e.status='active' LIMIT 1").get(bar);
         const ci = await admin('POST', '/api/checkin', { registrationId: z.rid, stage: 'prelim', items: [{ entryId: z.eid }] });
-        ok('تثبيت الحضور يسجّل المتسابق مباشرة في اللجنة المخصصة لفئته ومقرره دون اختيار', ci.status === 200 && ci.data.tickets[0].committeeId === ded && ci.data.tickets[0].status === 'waiting', ci.data);
-        S_ded = ded;
+        ok('تثبيت الحضور يسجّل المتسابقة مباشرة في لجنة فئتها ومسارها دون اختيار', ci.status === 200 && ci.data.tickets[0].committeeId === own && ci.data.tickets[0].status === 'waiting', ci.data);
       }
       ok('الحذف يتطلب عبارة التأكيد', (await admin('POST', '/api/admin/trial/clear', { confirm: 'نعم' })).status === 400);
       const cl = await admin('POST', '/api/admin/trial/clear', { confirm: 'حذف بيانات التجربة' });
       ok('حذف بيانات التجربة وكل ما يخصها، وبقاء التسجيلات الحقيقية', cl.status === 200 && cl.data.people === r.data.people && !db.prepare('SELECT 1 FROM people WHERE is_test=1').get() && db.prepare('SELECT COUNT(*) n FROM registrations').get().n === realRegs && (await tcl('GET', '/api/me')).status === 401, cl.data);
-      db.prepare('DELETE FROM committees WHERE id=?').run(S_ded);
       ok('إنشاء بيانات التجربة وحذفها في سجل التدقيق', db.prepare("SELECT COUNT(*) n FROM audit WHERE entity='trial'").get().n === 2);
     }
 

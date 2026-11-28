@@ -546,9 +546,9 @@ async function vReception() {
   const c = d.counts, pages = Math.max(1, Math.ceil(d.total / d.pageSize));
   const row = (r) => {
     const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
-    const quick = el.length && el.every((e) => e.candidates.length);
+    const quick = el.length && el.every((e) => e.candidates.length === 1);
     return `<tr><td><b>${esc(r.name)}</b>${me.role === 'top' ? `<br><small class="note">${esc(r.sectionName)}</small>` : ''}</td><td>${esc(r.category)}</td>
-    <td><div class="chips">${r.entries.map((e) => `<span class="ent"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${e.day ? ` <span class="tag ${e.day.today ? 'ok' : 'warn'} day">${esc(e.day.name)} · ${esc(e.day.label)}${e.day.today ? '' : ' (ليس اليوم)'}</span>` : ''} ${!e.needsCommittee ? '<span class="tag">اختبار إلكتروني</span>' : e.ticket && e.ticket.status !== 'cancelled' ? tTag(e.ticket) + (e.ticket.status === 'needs_committee' && e.candidates.length ? ` <button class="btn sm pri" data-act="tk-assign" data-id="${e.ticket.id}" data-c="${e.candidates[0].id}">إلى ${esc(e.candidates[0].name)}</button>` : '') + (['waiting', 'needs_committee', 'no_show'].includes(e.ticket.status) ? ` <button class="btn link" data-act="tk-cancel" data-id="${e.ticket.id}">إلغاء</button>` : '') : '<span class="tag">لم يحضر</span>'}</span>`).join('')}</div></td>
+    <td><div class="chips">${r.entries.map((e) => `<span class="ent"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${e.day ? ` <span class="tag ${e.day.today ? 'ok' : 'warn'} day">${esc(e.day.name)} · ${esc(e.day.label)}${e.day.today ? '' : ' (ليس اليوم)'}</span>` : ''} ${!e.needsCommittee ? '<span class="tag">اختبار إلكتروني</span>' : e.ticket && e.ticket.status !== 'cancelled' ? tTag(e.ticket) + (e.ticket.status === 'needs_committee' && e.candidates.length === 1 ? ` <button class="btn sm pri" data-act="tk-assign" data-id="${e.ticket.id}" data-c="${e.candidates[0].id}">إلى ${esc(e.candidates[0].name)}</button>` : '') + (['waiting', 'needs_committee', 'no_show'].includes(e.ticket.status) ? ` <button class="btn link" data-act="tk-cancel" data-id="${e.ticket.id}">إلغاء</button>` : '') : '<span class="tag">لم يحضر</span>'}</span>`).join('')}</div></td>
     <td>${el.length ? `<button class="btn ${quick ? 'pri' : ''} sm" data-act="${quick ? 'ci-quick' : 'ci-open'}" data-id="${r.id}">${quick ? 'تثبيت الحضور' : 'تسجيل الحضور…'}</button>${quick && el.length > 1 ? ` <button class="btn link" data-act="ci-open" data-id="${r.id}">اختيار</button>` : ''}` : '<span class="tag ok">حاضر</span>'}</td></tr>`;
   };
   return `<div class="head"><div><h1>الاستقبال وتسجيل الحضور</h1><p>${esc(d.stageName)} · ${me.role === 'top' ? (f.section ? esc(meta.sections[f.section]) : 'القسمان') : esc(me.sectionName)} · الأسماء مرتبة أبجديًا، والدور في الطابور بحسب وقت تثبيت الحضور</p></div><div class="acts"><a class="btn" href="#queues">الطوابير</a></div></div>
@@ -569,7 +569,7 @@ function checkinForm(r) {
   const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
   modal('تسجيل حضور ' + r.name, `<p class="note">اختر المشاركات التي يحضرها اليوم. حضور الحفظ لا يعني حضور التلاوة تلقائيًا.</p><form data-form="checkin" data-id="${r.id}"><p class="err" hidden></p>
   ${el.map((e) => `<div class="pick on"><label class="check"><input type="checkbox" name="e" value="${e.id}" checked>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</label>
-    ${e.candidates.length > 1 ? `<div class="field"><label>اللجنة</label><select name="c-${e.id}">${opts(e.candidates.map((x, i) => [x.id, x.name + (x.hall ? ' — ' + x.hall : '') + (i ? '' : ' (المخصصة)')]), e.candidates[0].id)}</select><small>اختيرت تلقائيًا اللجنة المخصصة لفئته ومقرره؛ غيّرها عند الحاجة فقط.</small></div>`
+    ${e.candidates.length > 1 ? `<div class="field"><label>اللجنة</label><select name="c-${e.id}">${opts(e.candidates.map((x) => [x.id, x.name + (x.hall ? ' — ' + x.hall : '')]), '', 'اختر اللجنة…')}</select><small class="note badn">أكثر من لجنة تشمل هذا المسار لهذه الفئة، والأصل لجنة واحدة. صحّح ذلك من صفحة «اللجان».</small></div>`
       : e.candidates.length ? `<p class="note">اللجنة: ${esc(e.candidates[0].name)}${e.candidates[0].hall ? ' — ' + esc(e.candidates[0].hall) : ''}</p>` : '<p class="err">لا توجد لجنة مطابقة؛ يُسجَّل حضوره «بانتظار تحديد اللجنة».</p>'}</div>`).join('')}
   <div class="acts"><button class="btn pri" type="submit">تثبيت الحضور</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`);
 }
@@ -601,7 +601,7 @@ async function vQueues() {
     <div class="acts">${me.role === 'top' ? [['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${q.section === k ? 'pri' : ''}" data-act="qsec" data-s="${k}">${n}</button>`).join('') : ''}${['exec', 'chief', 'top'].includes(me.role) ? '<a class="btn sm" href="#screen">شاشة الانتظار</a>' : ''}</div></div>
   ${stageBar()}
   ${d.needsCommittee.length ? `<div class="card warnbox"><h3>بانتظار تحديد اللجنة (${d.needsCommittee.length})</h3>${d.needsCommittee.map((t) => `<div class="acts needs"><span><b>${esc(t.name)}</b> · ${esc(t.branchName)}${t.trackName ? ' · ' + esc(t.trackName) : ''} · ${esc(t.category)} · #${t.seq}</span>
-    ${t.candidates.length ? `<select id="as-${t.id}" aria-label="اللجنة">${opts(t.candidates.map((x) => [x.id, x.name]), t.candidates[0].id)}</select><button class="btn sm pri" data-act="tk-assign" data-id="${t.id}">إسناد</button>` : '<span class="tag bad">لا توجد لجنة مطابقة: أنشئ لجنة من «اللجان»</span>'}</div>`).join('')}</div>` : ''}
+    ${t.candidates.length ? `<select id="as-${t.id}" aria-label="اللجنة">${opts(t.candidates.map((x) => [x.id, x.name]), t.candidates.length === 1 ? t.candidates[0].id : '', 'اختر اللجنة…')}</select><button class="btn sm pri" data-act="tk-assign" data-id="${t.id}">إسناد</button>` : '<span class="tag bad">لا توجد لجنة مطابقة: أنشئ لجنة من «اللجان»</span>'}</div>`).join('')}</div>` : ''}
   ${d.committees.length ? `<div class="qgrid">${d.committees.map(card).join('')}</div>` : `<div class="card empty"><p>${['judge', 'coordinator'].includes(me.role) ? 'لم تُكلَّف بلجنة بعد.' : 'لا توجد لجان نشطة.'}</p></div>`}`;
 }
 
@@ -611,6 +611,12 @@ async function vCommittees() {
   const [{ committees }, staff] = await Promise.all([api('/committees?stage=' + S.stage + (me.role === 'top' && q.section ? '&section=' + q.section : '')), ['exec', 'top'].includes(me.role) ? api('/staff').then((x) => x.staff) : Promise.resolve([])]);
   S.committees = committees; S.staff = staff;
   const admin = ['exec', 'top'].includes(me.role);
+  const cov = admin ? (await api('/committees/coverage?stage=' + S.stage + (me.role === 'top' && q.section ? '&section=' + q.section : ''))).sections : [];
+  const covBanner = cov.map((x) => {
+    const sn = me.role === 'top' ? ` (${esc(x.sectionName)})` : '';
+    return (x.conflicts.length ? `<div class="banner bad"><b>تداخل في اللجان${sn}:</b> لكل مسار في كل فئة لجنة واحدة فقط، وهذه المسارات تشملها أكثر من لجنة فلا يُسجَّل حضور أصحابها تلقائيًا. عدّل فئات إحدى اللجنتين أو مساراتها أو أوقفها:<ul>${x.conflicts.map((k) => `<li>${esc(k.cell)}: ${k.committees.map((n) => '«' + esc(n) + '»').join(' و')}</li>`).join('')}</ul></div>` : '')
+      + (x.missing.length ? `<div class="banner warn"><b>مسارات بلا لجنة${sn}:</b> ${x.missing.map(esc).join('، ')}. يُسجَّل حضور أصحابها «بانتظار تحديد اللجنة» حتى تُضاف لجنتها.</div>` : '');
+  }).join('');
   const card = (c) => {
     const pool = staff.filter((u) => u.section === c.section && !c.members.some((m) => m.userId === u.id));
     return `<article class="card"><div class="qh"><div><h3>${esc(c.name)} ${c.active ? '' : '<span class="tag bad">موقوفة</span>'}</h3><span class="note">${esc(c.hall || 'بدون قاعة')} · ${esc(c.stageName)}${me.role === 'top' ? ' · ' + esc(c.sectionName) : ''}</span></div>
@@ -619,9 +625,9 @@ async function vCommittees() {
       <ul class="members">${c.members.map((m) => `<li><span>${esc(m.name)} <small class="note">${m.kind === 'judge' ? esc(m.specialty || 'محكم') : 'منسق النداء'}</small></span>${c.canAdmin ? `<button class="btn link" data-act="cm-unassign" data-id="${c.id}" data-u="${m.userId}" aria-label="إلغاء تكليف ${esc(m.name)}">إلغاء</button>` : ''}</li>`).join('') || '<li class="note">لا تكليفات بعد</li>'}</ul>
       ${c.canAdmin && pool.length ? `<div class="acts"><select id="cm-u-${c.id}" aria-label="المستخدم">${opts(pool.map((u) => [u.id, u.name + ' — ' + (u.specialty || u.roleName)]), '', 'تكليف مستخدم…')}</select><select id="cm-k-${c.id}" aria-label="نوع التكليف">${opts([['judge', 'محكم'], ['coordinator', 'منسق النداء']], 'judge')}</select><button class="btn sm pri" data-act="cm-assign" data-id="${c.id}">تكليف</button></div>` : ''}</article>`;
   };
-  return `<div class="head"><div><h1>لجان التحكيم</h1><p>كل لجنة لفرع ومسار وفئات محددة في قسم واحد. يُسند الحاضر تلقائيًا إلى اللجنة المطابقة، وتظهر قاعتها على شاشة الانتظار.</p></div>
+  return `<div class="head"><div><h1>لجان التحكيم</h1><p>لكل مسار في كل فئة لجنة واحدة فقط في القسم، ويُسجَّل الحاضر فيها تلقائيًا. يمكن أن تختص لجنة بأكثر من مسار أو فئة. تظهر قاعتها على شاشة الانتظار.</p></div>
     <div class="acts">${me.role === 'top' ? [['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${q.section === k ? 'pri' : ''}" data-act="cmsec" data-s="${k}">${n}</button>`).join('') : ''}${admin ? '<button class="btn pri" data-act="cm-new">إضافة لجنة</button>' : ''}</div></div>
-  ${stageBar()}
+  ${stageBar()}${covBanner}
   ${admin && !staff.some((u) => u.role === 'judge') ? '<div class="banner info">لا توجد حسابات محكمين في القسم بعد. تنشئها الإدارة العليا من «الحسابات».</div>' : ''}
   <div class="qgrid">${committees.map(card).join('')}</div>`;
 }
@@ -640,7 +646,7 @@ function scopeBoxes(br, c) {
   const tracks = [...new Map(pub.curricula.filter((x) => x.branch === br && x.trackName).map((x) => [x.track, x.trackName])).entries()];
   const cats = pub.categories.filter((x) => x.branches.includes(br));
   return `${tracks.length > 1 ? `<div class="field"><span class="lab">المسارات (بدون تحديد = كلها)</span><div class="boxes">${tracks.map(([t, n]) => `<label><input type="checkbox" name="kt" value="${esc(t)}" ${c && c.tracks.includes(t) ? 'checked' : ''}>${esc(n)}</label>`).join('')}</div></div>` : ''}
-  <div class="field"><span class="lab">الفئات (بدون تحديد = كلها)</span><div class="boxes">${cats.map((x) => `<label><input type="checkbox" name="kc" value="${x.id}" ${c && c.categories.includes(x.id) ? 'checked' : ''}>${esc(x.name)}</label>`).join('')}</div><small>اسم اللجنة قد يجمع أكثر من فئة للتشغيل، ولا يعني ذلك دمجها في الترتيب.</small></div>`;
+  <div class="field"><span class="lab">الفئات (بدون تحديد = كلها)</span><div class="boxes">${cats.map((x) => `<label><input type="checkbox" name="kc" value="${x.id}" ${c && c.categories.includes(x.id) ? 'checked' : ''}>${esc(x.name)}</label>`).join('')}</div><small>اسم اللجنة قد يجمع أكثر من فئة للتشغيل، ولا يعني ذلك دمجها في الترتيب. لكل مسار في كل فئة لجنة واحدة فقط، فلا تُقبل لجنة تشمل مسارًا من اختصاص لجنة قائمة.</small></div>`;
 }
 
 // ---------- شاشة قاعة الانتظار ----------
