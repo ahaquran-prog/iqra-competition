@@ -115,7 +115,7 @@ app.post('/api/password', wrap((req, res) => {
 // ---------- التسجيلات: قراءة ----------
 const entriesOf = (rid) => db.prepare('SELECT * FROM entries WHERE registration_id=? ORDER BY id').all(rid)
   .map((e) => ({ id: e.id, branch: e.branch, branchName: e.branch_name, track: e.track, trackName: e.track_name, curriculum: e.curriculum_text, status: e.status }));
-const regSelect = `SELECT r.*, p.full_name, p.national_id, p.phone, p.phone2, p.gender, p.user_id, ru.name AS reviewer
+const regSelect = `SELECT r.*, p.full_name, p.national_id, p.phone, p.phone2, p.gender, p.user_id, p.is_test, ru.name AS reviewer
   FROM registrations r JOIN people p ON p.id=r.person_id LEFT JOIN users ru ON ru.id=r.reviewed_by`;
 // رئيس التحكيم «اطلاع عند الحاجة»: بلا هوية ولا هواتف
 function regJson(r, viewer) {
@@ -125,7 +125,7 @@ function regJson(r, viewer) {
     nationalId: full ? r.national_id : '', phone: full ? r.phone : '', phone2: full ? r.phone2 : '',
     birthYear: r.birth_year, categoryId: r.category_id, categoryName: r.category_name,
     status: r.status, statusName: REG_ST[r.status], staffNote: r.staff_note, reviewer: r.reviewer || '', reviewedAt: r.reviewed_at,
-    createdAt: r.created_at, updatedAt: r.updated_at, entries: entriesOf(r.id),
+    createdAt: r.created_at, updatedAt: r.updated_at, entries: entriesOf(r.id), isTest: !!r.is_test,
   };
 }
 function loadReg(req, id) {
@@ -576,6 +576,7 @@ require('./lib/tests')(app);
 require('./lib/materials').routes(app);
 require('./lib/draws').routes(app);
 require('./lib/days').routes(app);
+require('./lib/trial').routes(app);
 // الإشعارات ومواعيد المراحل
 const N = require('./lib/notify');
 N.routes(app);

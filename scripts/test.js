@@ -842,6 +842,36 @@ function client(base) {
     r = await ppl.c1.c('POST', '/api/my/withdraw', {});
     ok('المنسحب لا يرى المذكرات', r.status === 200 && (await myM(ppl.c1.c)).length === 0 && (await ppl.c1.c('GET', `/api/materials/${M1.id}/file`)).status === 404);
 
+    console.log('بيانات التجربة قبل التدشين');
+    {
+      const realRegs = db.prepare('SELECT COUNT(*) n FROM registrations').get().n;
+      ok('بيانات التجربة للإدارة العليا فقط', (await sara('POST', '/api/admin/trial', { perGroup: 1, password: 'Trial-2026' })).status === 403);
+      ok('رفض كلمة مرور ضعيفة لحسابات التجربة', (await admin('POST', '/api/admin/trial', { perGroup: 1, password: '1' })).status === 400);
+      r = await admin('POST', '/api/admin/trial', { perGroup: 2, password: 'Trial-2026', mixRatio: 100 });
+      const tc = db.prepare("SELECT r.section, r.category_id, e.curriculum_id, COUNT(*) n FROM entries e JOIN registrations r ON r.id=e.registration_id JOIN people p ON p.id=r.person_id WHERE p.is_test=1 GROUP BY 1,2,3").all();
+      const cmp = db.prepare("SELECT * FROM competitions WHERE is_current=1").get();
+      const want = new Set(); for (const k of require('../lib/rules').categoriesOf(cmp.id)) for (const b of require('../lib/rules').optionsFor(cmp, k)) if (b.code !== 'research') for (const t2 of b.tracks) for (const sc of ['M', 'F']) want.add(`${sc}:${k.id}:${t2.curriculumId}`);
+      const got = new Set(tc.map((x) => `${x.section}:${x.category_id}:${x.curriculum_id}`));
+      ok('التجربة تغطي كل قسم وفئة ومقرر في كل الفروع', r.status === 200 && r.data.people > 0 && [...want].every((k) => got.has(k)), { missing: [...want].filter((k) => !got.has(k)) });
+      ok('بعض المتسابقين التجريبيين في فرعين', r.data.entries > r.data.people);
+      ok('كل التجريبيين مقبولون ومعلّمون', db.prepare("SELECT COUNT(*) n FROM registrations r JOIN people p ON p.id=r.person_id WHERE p.is_test=1 AND r.status='accepted'").get().n === r.data.people);
+      const tp = db.prepare("SELECT p.national_id, p.user_id FROM people p WHERE is_test=1 LIMIT 1").get();
+      const tcl = client(base); const lr = await tcl('POST', '/api/login', { login: tp.national_id, password: 'Trial-2026' });
+      ok('المتسابق التجريبي يدخل برقمه وكلمة المرور الموحدة دون إلزام بتغييرها', lr.status === 200 && (await tcl('GET', '/api/my')).status === 200);
+      require('../lib/notify').notify([tp.user_id], 'material', { title: 'ت', body: 'ت', key: 'trial-test' });
+      ok('لا تُرسل رسائل خارجية لحسابات التجربة (أرقام وهمية)', db.prepare('SELECT COUNT(*) n FROM deliveries d JOIN notifications n ON n.id=d.notification_id WHERE n.user_id=?').get(tp.user_id).n === 0);
+      const lst = await admin('GET', '/api/registrations?q=' + encodeURIComponent(tp.national_id));
+      ok('علامة «تجريبي» في قائمة المسجلين', lst.status === 200 && lst.data.rows.some((x) => x.isTest));
+      const xl = await admin('GET', '/api/admin/trial.xlsx');
+      ok('تنزيل حسابات التجربة Excel', xl.status === 200 && require('../lib/xlsx').read(xl.data).length === r.data.people + 1);
+      const tEnt = db.prepare("SELECT e.id, r.id rid, r.person_id FROM entries e JOIN registrations r ON r.id=e.registration_id JOIN people p ON p.id=r.person_id WHERE p.is_test=1 LIMIT 1").get();
+      db.prepare("INSERT INTO tickets(comp_id,entry_id,registration_id,person_id,section,stage,status,seq,arrived_at,updated_at) SELECT ?,?,?,?, 'M','prelim','waiting',9999,1,1").run(cmp.id, tEnt.id, tEnt.rid, tEnt.person_id);
+      ok('الحذف يتطلب عبارة التأكيد', (await admin('POST', '/api/admin/trial/clear', { confirm: 'نعم' })).status === 400);
+      const cl = await admin('POST', '/api/admin/trial/clear', { confirm: 'حذف بيانات التجربة' });
+      ok('حذف بيانات التجربة وكل ما يخصها، وبقاء التسجيلات الحقيقية', cl.status === 200 && cl.data.people === r.data.people && !db.prepare('SELECT 1 FROM people WHERE is_test=1').get() && db.prepare('SELECT COUNT(*) n FROM registrations').get().n === realRegs && (await tcl('GET', '/api/me')).status === 401, cl.data);
+      ok('إنشاء بيانات التجربة وحذفها في سجل التدقيق', db.prepare("SELECT COUNT(*) n FROM audit WHERE entity='trial'").get().n === 2);
+    }
+
     console.log('إعداد الدورة');
     r = await admin('GET', '/api/admin/competition');
     const cats = r.data.categories.map((c) => ({ ...c }));

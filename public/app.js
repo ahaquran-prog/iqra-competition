@@ -384,7 +384,7 @@ async function vRegs() {
     <button class="btn pri" type="submit">بحث</button></form>
   <p class="note">${d.total} مسجّلًا</p>
   ${d.rows.length ? `<div class="scroll"><table class="list stack"><thead><tr><th>الاسم</th>${chief ? '' : '<th>الهوية</th><th>الهاتف</th>'}${me.role === 'top' ? '<th>القسم</th>' : ''}<th>الفئة</th><th>المشاركات</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>
-  ${d.rows.map((r) => `<tr class="click" data-act="reg" data-id="${r.id}" tabindex="0"><td><b>${esc(r.fullName)}</b></td>${chief ? '' : `<td class="ltr">${esc(r.nationalId)}</td><td class="ltr">${esc(r.phone)}</td>`}${me.role === 'top' ? `<td>${esc(r.sectionName)}</td>` : ''}<td>${esc(r.categoryName)}</td><td>${entryChips(r.entries)}</td><td>${stTag(r.status, r.statusName)}</td><td class="n">${esc(fmtD(r.createdAt))}</td></tr>`).join('')}
+  ${d.rows.map((r) => `<tr class="click" data-act="reg" data-id="${r.id}" tabindex="0"><td><b>${esc(r.fullName)}</b>${r.isTest ? ' <span class="tag warn">تجريبي</span>' : ''}</td>${chief ? '' : `<td class="ltr">${esc(r.nationalId)}</td><td class="ltr">${esc(r.phone)}</td>`}${me.role === 'top' ? `<td>${esc(r.sectionName)}</td>` : ''}<td>${esc(r.categoryName)}</td><td>${entryChips(r.entries)}</td><td>${stTag(r.status, r.statusName)}</td><td class="n">${esc(fmtD(r.createdAt))}</td></tr>`).join('')}
   </tbody></table></div>
   <div class="pager"><span class="note">صفحة ${d.page} من ${pages}</span><div class="acts"><button class="btn sm" data-act="page" data-p="${d.page - 1}" ${d.page > 1 ? '' : 'disabled'}>السابق</button><button class="btn sm" data-act="page" data-p="${d.page + 1}" ${d.page < pages ? '' : 'disabled'}>التالي</button></div></div>`
     : '<div class="empty"><p>لا توجد تسجيلات مطابقة.</p></div>'}</div>`;
@@ -396,7 +396,7 @@ async function openReg(id) {
   const chief = me.role === 'chief';
   const act = canManage() && r.status !== 'withdrawn';
   modal(r.fullName, `<p class="err" hidden></p>
-  <div class="status"><span class="big">${esc(r.statusName)}</span>${stTag(r.status)}<span class="note">${esc(r.sectionName)} · ${esc(r.categoryName)}</span></div>
+  <div class="status"><span class="big">${esc(r.statusName)}</span>${stTag(r.status)}${r.isTest ? '<span class="tag warn">تجريبي</span>' : ''}<span class="note">${esc(r.sectionName)} · ${esc(r.categoryName)}</span></div>
   ${r.staffNote ? `<p class="banner">${esc(r.staffNote)}</p>` : ''}
   <dl class="kv">${chief ? '' : `<dt>رقم الهوية</dt><dd class="ltr">${esc(r.nationalId)}</dd><dt>الهاتف</dt><dd class="ltr">${esc(r.phone)}${r.phone2 ? ' · ' + esc(r.phone2) : ''}</dd>`}<dt>سنة الميلاد</dt><dd>${esc(r.birthYear)}</dd><dt>الجنس</dt><dd>${r.gender === 'F' ? 'أنثى' : 'ذكر'}</dd><dt>تاريخ التسجيل</dt><dd>${esc(fmt(r.createdAt))}</dd>${r.reviewer ? `<dt>آخر مراجعة</dt><dd>${esc(r.reviewer)} · ${esc(fmt(r.reviewedAt))}</dd>` : ''}</dl>
   <h3>المشاركات</h3>${r.entries.map((e) => `<div class="entry ${e.status === 'active' ? '' : 'off'}"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${e.status === 'active' ? '' : '<span class="tag">ملغاة</span>'}<span class="cur">${esc(e.curriculum)}</span></div>`).join('')}
@@ -438,10 +438,23 @@ async function vDash() {
 async function vSettings() {
   S.adm = await api('/admin/competition');
   S.sp = (await api('/admin/stage-passages')).rows;
+  const tr = await api('/admin/trial');
   const a = S.adm, c = a.competition, codes = a.branches;
   const catOpts = [['', 'لكل الأعمار'], ...a.categories.map((x) => [x.id, x.name])];
   return `<div class="head"><div><h1>إعداد الدورة</h1><p>${esc(c.name)} · الدورة ${esc(c.number)} · ${a.registrations} تسجيلًا</p></div></div>
   <div class="banner info">تعديل الفئات والمقررات لا يغيّر المقررات المحفوظة في المشاركات السابقة؛ كل مشاركة تحتفظ بنسخة الفئة والمقرر وقت تسجيلها.</div>
+  <details class="blk" ${tr.people ? 'open' : ''}><summary>بيانات التجربة قبل التدشين${tr.people ? ` <span class="tag warn">${tr.people} متسابقًا تجريبيًا</span>` : ''}</summary>
+    <p class="note">يُنشئ متسابقين وهميين مقبولين في كل قسم وفئة وفرع ومسار (عدا البحث)، ليجرّب الكادر والمتسابقون العمليات كاملة: التوزيع على الأيام، الحضور وQR، النداء، التحكيم، النتائج، القرعة، واختبار التفسير. يحملون علامة «تجريبي» في قوائم المسجلين، ولا تصلهم إشعارات خارجية لأن هواتفهم وهمية، ولا يُمس إعداد الدورة ولا الحسابات ولا البنوك. قبل التدشين احذفها بزر الحذف أدناه.</p>
+    ${tr.people ? `<div class="chips"><span class="tag">الرجال ${tr.bySection.M || 0}</span><span class="tag">النساء ${tr.bySection.F || 0}</span>${Object.entries(tr.entries).map(([k, n]) => `<span class="tag">${esc(k)} ${n}</span>`).join('')}</div>
+    <div class="acts"><button class="btn" data-act="xl" data-href="/api/admin/trial.xlsx" data-n="iqra-trial-accounts.xlsx">تنزيل حسابات التجربة (Excel)</button></div>` : ''}
+    <form data-form="trial" class="card"><p class="err" hidden></p>
+      <div class="row3"><div class="field"><label for="t-per">عدد المتسابقين لكل مقرر وفئة</label><input id="t-per" inputmode="numeric" value="3"><small>من 1 إلى 20</small></div>
+      <div class="field"><label for="t-mix">نسبة المشاركين في فرعين %</label><input id="t-mix" inputmode="numeric" value="30"></div>
+      <div class="field"><label for="t-pass">كلمة مرور موحدة لحساباتهم <span class="req">*</span></label><input id="t-pass" class="ltr" required><small>اسم الدخول لكل متسابق رقمه الشخصي (يبدأ بـ 99) في ملف Excel</small></div></div>
+      <div class="boxes"><label><input type="checkbox" name="tsec" value="M" checked>قسم الرجال</label><label><input type="checkbox" name="tsec" value="F" checked>قسم النساء</label></div>
+      <button class="btn pri" type="submit">${tr.people ? 'إضافة دفعة أخرى' : 'إنشاء بيانات التجربة'}</button></form>
+    ${tr.people ? `<form data-form="trial-clear" class="card"><p class="err" hidden></p><p><b>حذف بيانات التجربة</b>: يحذف المتسابقين التجريبيين وكل ما يخصهم (الحضور والنداء والدرجات والقرعة والاختبارات والإشعارات وتوزيع الأيام)، وكشوف النتائج التي ضمّتهم. يبقى أثر العملية في سجل التدقيق.</p>
+      <div class="field"><label for="t-confirm">اكتب: حذف بيانات التجربة</label><input id="t-confirm" autocomplete="off"></div><button class="btn badb" type="submit">حذف بيانات التجربة نهائيًا</button></form>` : ''}</details>
   <details class="blk" open><summary>بيانات الدورة ومواعيد التسجيل</summary><form data-form="comp"><p class="err" hidden></p>
     <div class="row3"><div class="field"><label for="k-name">اسم المسابقة</label><input id="k-name" value="${esc(c.name)}" required></div><div class="field"><label for="k-number">رقم الدورة</label><input id="k-number" inputmode="numeric" value="${esc(c.number)}"></div><div class="field"><label for="k-year">سنة الدورة</label><input id="k-year" inputmode="numeric" value="${esc(c.year)}"></div></div>
     <div class="row3"><div class="field"><label for="k-open">فتح التسجيل</label><input id="k-open" type="date" value="${esc(c.regOpen || '')}"><small>فارغ: يُعرض «بانتظار الإعلان».</small></div><div class="field"><label for="k-close">إغلاق التسجيل</label><input id="k-close" type="date" value="${esc(c.regClose || '')}"></div><div class="field"><label for="k-edit">آخر موعد لتعديل الفروع</label><input id="k-edit" type="date" value="${esc(c.editClose || '')}"></div></div>
@@ -1432,6 +1445,14 @@ document.addEventListener('submit', async (e) => {
       const g = (n) => f.elements[n];
       await api('/admin/branches/' + f.dataset.id, { method: 'PUT', body: { name: g('name').value, stages: g('stages').value, intro: g('intro').value, conditions: g('conditions').value, registrable: g('registrable').checked } });
       await refreshPublic(); toast('حُفظ الفرع');
+    }
+    else if (k === 'trial') {
+      const r = await api('/admin/trial', { method: 'POST', body: { perGroup: val('t-per'), mixRatio: val('t-mix'), password: val('t-pass'), sections: [...f.querySelectorAll('[name=tsec]:checked')].map((x) => x.value) } });
+      toast(`أُنشئ ${r.people} متسابقًا تجريبيًا (${r.entries} مشاركة). نزّل ملف الحسابات لتوزيعه على اللجنة`); render();
+    }
+    else if (k === 'trial-clear') {
+      const r = await api('/admin/trial/clear', { method: 'POST', body: { confirm: val('t-confirm') } });
+      toast(`حُذف ${r.people} متسابقًا تجريبيًا وكل ما يخصهم`); render();
     }
     else if (k === 'newcomp') {
       await api('/admin/competitions', { method: 'POST', body: { name: val('n-name'), number: val('n-number'), year: val('n-year') } });
