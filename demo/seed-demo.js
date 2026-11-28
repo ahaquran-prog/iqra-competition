@@ -177,7 +177,7 @@ function client(base) {
   const tl = await adm('GET', '/api/tests');
   const curB = tl.curricula.find((x) => x.kind === 'branch' && x.name.includes('الشباب'));
   const curP = tl.curricula.find((x) => x.kind === 'passage' && x.name.includes('ترتيل') && x.name.includes('اليافعون'));
-  const tB = (await adm('POST', '/api/tests', { curriculumId: curB.id, title: 'اختبار فرع التفسير — الشباب (سورة الصافات)', reference: 'يُحدَّد الكتاب المرجعي ونسخته قبل الاختبار الفعلي', questionCount: 5, durationMin: 15 })).test;
+  const tB = (await adm('POST', '/api/tests', { curriculumId: curB.id, title: 'اختبار فرع التفسير — الشباب (سورة الصافات)', reference: 'يُحدَّد الكتاب المرجعي ونسخته قبل الاختبار الفعلي (عينة تجريبية: الاختبار الفعلي 25 + 25 سؤالًا)', mcqCount: 3, tfCount: 2, points: 2, durationMin: 15 })).test;
   await adm('POST', `/api/tests/${tB.id}/import`, { text: [
     'كم عدد آيات سورة الصافات؟\nأ) 112\nب) 182 *\nج) 128\nد) 200\nالمصدر: المصحف الشريف',
     'سورة الصافات مكية\nصح *\nخطأ',
@@ -188,7 +188,7 @@ function client(base) {
   ].join('\n\n') });
   for (const q of (await chief('GET', `/api/tests/${tB.id}`)).questions) await chief('POST', `/api/questions/${q.id}/review`, { approve: true });
   await adm('PUT', `/api/tests/${tB.id}`, { ...tB, status: 'open' });
-  const tP = (await adm('POST', '/api/tests', { curriculumId: curP.id, title: 'اختبار تفسير مقطع الترتيل — اليافعون (الزخرف 1–7)', questionCount: 3, durationMin: 10 })).test;
+  const tP = (await adm('POST', '/api/tests', { curriculumId: curP.id, title: 'اختبار تفسير مقطع الترتيل — اليافعون (الزخرف 1–7)', mcqCount: 1, tfCount: 2, points: 2, durationMin: 10 })).test;
   await adm('POST', `/api/tests/${tP.id}/import`, { text: ['سورة الزخرف مكية\nصح *\nخطأ', 'تبدأ سورة الزخرف بالحروف المقطعة\nصح *\nخطأ', 'كم عدد آيات سورة الزخرف؟\nأ) 89 *\nب) 99\nج) 75'].join('\n\n') });
   for (const q of (await chief('GET', `/api/tests/${tP.id}`)).questions) await chief('POST', `/api/questions/${q.id}/review`, { approve: true });
   await adm('PUT', `/api/tests/${tP.id}`, { ...tP, status: 'open' });

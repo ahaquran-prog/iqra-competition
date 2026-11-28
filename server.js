@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 });
 // رفع المذكرات وحده يقبل طلبًا كبيرًا (الملف بترميز base64)، وبقية الطلبات محدودة
 const bigJson = express.json({ limit: Math.ceil(config.materialMaxMB * 1.4 + 1) + 'mb' }), smallJson = express.json({ limit: '200kb' });
-app.use((req, res, next) => ((req.method === 'POST' || req.method === 'PUT') && /^\/api\/admin\/(materials(\/\d+\/file)?|bank\/import)$/.test(req.path) ? bigJson : smallJson)(req, res, next));
+app.use((req, res, next) => ((req.method === 'POST' || req.method === 'PUT') && (/^\/api\/admin\/(materials(\/\d+\/file)?|bank\/import)$/.test(req.path) || /^\/api\/tests\/\d+\/import-xlsx$/.test(req.path)) ? bigJson : smallJson)(req, res, next));
 app.use((err, req, res, next) => {
   if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'حجم الطلب أكبر من المسموح' });
   if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'صيغة الطلب غير صحيحة' });

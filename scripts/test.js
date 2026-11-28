@@ -568,16 +568,47 @@ function client(base) {
     const tilY = tl.data.curricula.find((x) => x.kind === 'passage' && x.name.includes('تدوير') && x.name.includes('اليافعون'));
     r = await chiefM('POST', '/api/tests', { curriculumId: tafY.id, title: 'x', questionCount: 2, durationMin: 10 });
     ok('إنشاء الاختبارات من صلاحية الإدارة العليا', r.status === 403);
-    r = await admin('POST', '/api/tests', { curriculumId: tafY.id, title: 'اختبار فرع التفسير — اليافعون', reference: 'كتاب مرجعي، الطبعة الأولى', questionCount: 2, durationMin: 10 });
+    r = await admin('POST', '/api/tests', { curriculumId: tafY.id, title: 'x', durationMin: 10 });
+    ok('الاختبار الجديد افتراضيًا: 25 اختيار من متعدد و25 صح أو خطأ، ودرجتان لكل سؤال (100)', r.data.test.mcqCount === 25 && r.data.test.tfCount === 25 && r.data.test.points === 2 && r.data.test.max === 100 && r.data.test.questionCount === 50);
+    db.prepare('DELETE FROM tests WHERE id=?').run(r.data.test.id);
+    r = await admin('POST', '/api/tests', { curriculumId: tafY.id, title: 'اختبار فرع التفسير — اليافعون', reference: 'كتاب مرجعي، الطبعة الأولى', mcqCount: 1, tfCount: 1, points: 2, durationMin: 10 });
     const T = r.data.test;
     ok('إنشاء اختبار فرع التفسير لمقرر الفئة', r.status === 200 && T.kind === 'branch');
-    const T2 = (await admin('POST', '/api/tests', { curriculumId: tilY.id, title: 'تفسير مقطع التدوير — اليافعون', questionCount: 1, durationMin: 10 })).data.test;
+    const T2 = (await admin('POST', '/api/tests', { curriculumId: tilY.id, title: 'تفسير مقطع التدوير — اليافعون', mcqCount: 0, tfCount: 1, durationMin: 10 })).data.test;
     r = await admin('POST', `/api/tests/${T.id}/import`, { text: 'كم عدد آيات سورة الفاتحة؟\nأ) 6\nب) 7 *\nج) 8\n\nسورة النبأ مكية\nصح *\nخطأ\n\nسؤال بلا إجابة صحيحة\nأ) 1\nب) 2' });
     ok('الاستيراد يرفض سؤالًا بلا إجابة صحيحة معلَّمة', r.status === 400 && /علّم/.test(r.data.error));
     r = await admin('POST', `/api/tests/${T.id}/import`, { text: 'كم عدد آيات سورة الفاتحة؟\nأ) 6\nب) 7 *\nج) 8\n\nسورة النبأ مكية\nصح *\nخطأ\n\nكم عدد آيات سورة النبأ؟\nأ) 30\nب) 40 *\nج) 50' });
     ok('استيراد بنك الأسئلة من نص', r.status === 200 && r.data.imported === 3);
     r = await admin('PUT', `/api/tests/${T.id}`, { ...T, status: 'open' });
     ok('لا يُفتح الاختبار قبل اعتماد أسئلة كافية', r.status === 409);
+    {
+      const X = require('../lib/xlsx'), TX = (await admin('POST', '/api/tests', { curriculumId: tl.data.curricula.find((x) => x.kind === 'branch' && x.name.includes('الشباب')).id, title: 'اختبار Excel', mcqCount: 2, tfCount: 2, durationMin: 10 })).data.test;
+      const file = (rows) => ({ name: 'bank.xlsx', data: Buffer.from(X.write([{ name: 'بنك', rows }])).toString('base64') });
+      const H = ['النوع', 'السؤال', 'الخيار 1', 'الخيار 2', 'الخيار 3', 'الخيار 4', 'الإجابة الصحيحة', 'المصدر'];
+      r = await admin('POST', `/api/tests/${TX.id}/import-xlsx`, { file: file([H, ['اختيار من متعدد', 'س1', 'أ', 'ب', 'ج', '', 5], ['صح أو خطأ', 'س2', '', '', '', '', 'ربما'], ['مقالي', 'س3']]) });
+      ok('رفع البنك من Excel يرفض الملف كله ويذكر أرقام الصفوف', r.status === 400 && /الصف 2/.test(r.data.error) && /الصف 3/.test(r.data.error) && /الصف 4/.test(r.data.error) && (await admin('GET', `/api/tests/${TX.id}`)).data.questions.length === 0);
+      r = await admin('POST', `/api/tests/${TX.id}/import-xlsx`, { file: file([H,
+        ['اختيار من متعدد', 'في أي سورة آية الكرسي؟', 'آل عمران', 'البقرة', 'النساء', '', '٢', 'المرجع ص 3'],
+        ['اختيار من متعدد', 'عدد آيات الفاتحة؟', '6', '7', '8', '', 'ب'],
+        ['اختيار من متعدد', 'سورة مدنية؟', 'الحج', 'الكهف', '', '', 'الحج'],
+        ['صح أو خطأ', 'سورة النبأ مكية', '', '', '', '', 'صح'], ['صح أو خطأ', 'سورة البقرة مكية', '', '', '', '', 'خطأ'], ['صح أو خطأ', 'الفاتحة سبع آيات', '', '', '', '', 'صح'], []]) });
+      ok('رفع البنك من Excel: الإجابة رقمًا أو حرفًا أو نصًا، وصح أو خطأ', r.status === 200 && r.data.added === 6, r.data);
+      let qx = (await admin('GET', `/api/tests/${TX.id}`)).data.questions;
+      ok('الأسئلة المستوردة صحيحة المفتاح وتنتظر المراجعة', qx.find((q) => q.text.includes('الكرسي')).correct === 1 && qx.find((q) => q.text.includes('الفاتحة؟')).correct === 1 && qx.find((q) => q.text.includes('مدنية')).correct === 0 && qx.find((q) => q.text.includes('البقرة مكية')).correct === 1 && qx.every((q) => q.status === 'draft'));
+      r = await admin('POST', `/api/tests/${TX.id}/import-xlsx`, { file: file([H, ['صح أو خطأ', 'سورة النبأ مكية', '', '', '', '', 'صح']]), approve: true });
+      ok('لا يتكرر سؤال موجود', r.data.added === 0 && r.data.skipped === 1);
+      ok('تنفيذية القسم لا ترفع البنك', (await execM('POST', `/api/tests/${TX.id}/import-xlsx`, { file: file([H]) })).status === 403);
+      r = await chiefM('POST', `/api/tests/${TX.id}/approve-all`, {});
+      ok('اعتماد كل الأسئلة بانتظار المراجعة دفعة واحدة', r.data.approved === 6);
+      r = await admin('PUT', `/api/tests/${TX.id}`, { ...TX, mcqCount: 4, status: 'open' });
+      ok('لا يُفتح الاختبار إن نقص نوع عن عدده (4 اختيار والمعتمد 3)', r.status === 409 && /3 و3/.test(r.data.error), r.data.error);
+      r = await chiefM('GET', `/api/tests/${TX.id}/bank.xlsx`);
+      const bx = X.read(r.data);
+      ok('تنزيل البنك Excel يصلح للرفع من جديد', r.status === 200 && bx[0][0] === 'النوع' && bx.length === 7 && bx.some((x) => x[0] === 'صح أو خطأ' && x[6] === 'خطأ'));
+      r = await admin('POST', `/api/tests/${TX.id}/import-xlsx`, { file: { name: 'b.xlsx', data: Buffer.from(X.write([{ name: 'b', rows: bx.map((x) => x.slice(0, 8)) }])).toString('base64') }, mode: 'replace', approve: true });
+      ok('رفع الملف المنزَّل بالاستبدال يعيد البنك نفسه', r.status === 200 && r.data.added === 6 && r.data.removed === 6, r.data);
+      db.prepare('DELETE FROM test_questions WHERE test_id=?').run(TX.id); db.prepare('DELETE FROM tests WHERE id=?').run(TX.id);
+    }
     let bank = (await chiefM('GET', `/api/tests/${T.id}`)).data.questions;
     for (const q of bank) await chiefM('POST', `/api/questions/${q.id}/review`, { approve: true });
     r = await admin('PUT', `/api/tests/${T.id}`, { ...T, status: 'open' });
@@ -593,6 +624,7 @@ function client(base) {
     ok('بدء الاختبار مرتين ينشئ محاولة واحدة', s1.status === 200 && s2.status === 200 && db.prepare('SELECT COUNT(*) n FROM test_attempts WHERE test_id=?').get(T.id).n === 1);
     let at = await c6('GET', `/api/my/tests/${T.id}/attempt`);
     ok('المحاولة: أسئلة مسحوبة بلا مفتاح التصحيح', at.data.questions.length === 2 && at.data.questions.every((q) => q.correct === undefined) && !JSON.stringify(at.data).includes('"correct"'));
+    ok('المحاولة: سؤال اختيار من متعدد ثم سؤال صح أو خطأ بالعدد المحدد، ودرجتان لكل سؤال', at.data.questions[0].type === 'mcq' && at.data.questions[1].type === 'tf' && at.data.questions.every((q) => q.points === 2));
     const qa = at.data.questions[0], key = db.prepare('SELECT correct FROM test_questions WHERE id=?').get(qa.id).correct;
     await c6('PUT', `/api/my/tests/${T.id}/answer`, { questionId: qa.id, choice: key });
     r = await c6('PUT', `/api/my/tests/${T.id}/answer`, { questionId: 999999, choice: 0 });
@@ -605,7 +637,7 @@ function client(base) {
     r = await c6('GET', '/api/my/tests');
     ok('الدرجة لا تظهر للمتسابق قبل نشر النتائج', r.data.tests[0].attempt.status === 'submitted' && r.data.tests[0].result === null);
     r = await chiefM('GET', `/api/tests/${T.id}/results`);
-    ok('رئيس التحكيم يرى الدرجة وزمن الحل والترتيب', r.data.rows[0].score === 1 && r.data.rows[0].max === 2 && r.data.rows[0].rank === 1 && r.data.rows[0].seconds >= 0);
+    ok('رئيس التحكيم يرى الدرجة (درجتان لكل سؤال) وزمن الحل والترتيب', r.data.rows[0].score === 2 && r.data.rows[0].max === 4 && r.data.rows[0].rank === 1 && r.data.rows[0].seconds >= 0);
     r = await execM('GET', `/api/tests/${T.id}/results`);
     ok('التنفيذية ترى «أُنجز» دون الدرجة', r.status === 200 && r.data.rows[0].status === 'submitted' && r.data.rows[0].score === undefined);
     r = await admin('POST', `/api/tests/${T.id}/publish`, {});
@@ -613,7 +645,7 @@ function client(base) {
     await admin('PUT', `/api/tests/${T.id}`, { ...T, status: 'closed' });
     await admin('POST', `/api/tests/${T.id}/publish`, {});
     r = await c6('GET', '/api/my/tests');
-    ok('بعد النشر يرى المتسابق درجته', r.data.tests[0].result && r.data.tests[0].result.score === 1);
+    ok('بعد النشر يرى المتسابق درجته', r.data.tests[0].result && r.data.tests[0].result.score === 2);
     // انتهاء الوقت: إرسال آلي بزمن الخادم
     await admin('PUT', `/api/tests/${T2.id}`, { ...T2, status: 'draft' });
     const tq = (await admin('POST', `/api/tests/${T2.id}/questions`, { type: 'tf', text: 'سورة ق مكية', correct: 0 })).data.id;
