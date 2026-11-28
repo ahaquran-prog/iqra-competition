@@ -255,6 +255,23 @@ function client(base) {
     r = await execM('POST', '/api/committees', { name: 'الحفظ: اليافعون 2', branch: 'hifz', categories: [hifzY.categories[0]], hall: 'القاعة 7' });
     ok('إنشاء لجنة إضافية في القسم', r.status === 200 && r.data.committee.section === 'M');
     const extra = r.data.committee;
+    // رمز QR للحضور: المتسابق يعرضه، والإدارة التنفيذية تمسحه فيُسجَّل حضوره
+    r = await ppl.c4.c('GET', '/api/my/qr');
+    const qr4 = r.data.qr;
+    ok('رمز QR في حساب المتسابق: رابط برمز عشوائي وصورة SVG', qr4 && /#qr\/[A-Za-z0-9_-]{20,}$/.test(qr4.url) && qr4.svg.startsWith('<svg'));
+    ok('الرمز ثابت للمتسابق', (await ppl.c4.c('GET', '/api/my/qr')).data.qr.url === qr4.url);
+    r = await execM('GET', '/api/checkin/qr?code=' + encodeURIComponent(qr4.url));
+    ok('معاينة صاحب الرمز: الاسم والمشاركات المستحقة دون رقم الهوية كاملًا', r.status === 200 && r.data.name.startsWith('ياسر') && r.data.stage === 'prelim' && r.data.entries.length === 1 && !r.data.entries[0].checkedIn && r.data.nationalIdTail.length === 4 && !JSON.stringify(r.data).includes('2000000004'), r.data);
+    ok('الرمز لا يُقرأ من القسم الآخر', (await execF('GET', '/api/checkin/qr?code=' + encodeURIComponent(qr4.url))).status === 403);
+    ok('المتسابق لا يمسح الرموز', (await ppl.c2.c('POST', '/api/checkin/qr', { code: qr4.url, stage: 'prelim' })).status === 403);
+    ok('رمز غير صحيح', (await execM('POST', '/api/checkin/qr', { code: 'abc', stage: 'prelim' })).status === 400 && (await execM('POST', '/api/checkin/qr', { code: 'x'.repeat(22), stage: 'prelim' })).status === 404);
+    ok('غير المتأهل لا يُسجَّل حضوره في النهائي بالرمز', (await execM('POST', '/api/checkin/qr', { code: qr4.url, stage: 'final' })).status === 409);
+    r = await execM('POST', '/api/checkin/qr', { code: qr4.url.split('/#qr/')[1], stage: 'prelim' });
+    ok('مسح الرمز يسجّل الحضور مباشرة (برابط أو برمز مجرد)', r.status === 200 && !r.data.already && r.data.tickets.length === 1 && r.data.tickets[0].seq > 0 && r.data.entries[0].checkedIn, r.data);
+    const seq4 = r.data.tickets[0].seq;
+    r = await execM('POST', '/api/checkin/qr', { code: qr4.url, stage: 'prelim' });
+    ok('المسح المكرر لا ينشئ حضورًا جديدًا', r.data.already && r.data.tickets[0].seq === seq4);
+    ok('تسجيل الحضور بالرمز في سجل التدقيق', db.prepare("SELECT 1 FROM audit WHERE action='checkin' AND summary LIKE '%بمسح رمز QR%'").get());
     r = await ci('c4', [0]);
     ok('عند وجود أكثر من لجنة مطابقة: بانتظار تحديد اللجنة', r.data.tickets[0].status === 'needs_committee');
     r = await chiefM('POST', `/api/tickets/${r.data.tickets[0].id}/assign`, { committeeId: tarY.id });

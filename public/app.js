@@ -55,6 +55,12 @@ const homeOf = () => navFor()[0][0];
 function go(v) { if (location.hash !== '#' + v) location.hash = v; else route(); }
 function route() {
   const h = location.hash.slice(1);
+  // رابط رمز الحضور: يفتحه موظف الاستقبال بكاميرا هاتفه
+  if (h.startsWith('qr/')) {
+    S.qrCode = decodeURIComponent(h.slice(3));
+    if (!me) { try { sessionStorage.setItem('iqraNext', h); } catch (e) {} }
+    else if (['exec', 'top'].includes(me.role)) { view = 'qrcheck'; stopPoll(); document.body.classList.remove('screen-mode'); render(); scrollTo(0, 0); return; }
+  }
   if (h === 'view') { $('#view').focus(); history.replaceState(null, '', '#' + view); return; }
   const allowed = navFor().map((x) => x[0]).concat(me && me.role !== 'screen' ? ['inbox'] : []);
   view = allowed.includes(h) ? h : homeOf();
@@ -198,6 +204,7 @@ async function vMy() {
   S.myM = S.my.registration ? (await api('/my/materials')).rows : [];
   S.myD = S.my.registration ? (await api('/my/draws')).rows : [];
   S.myDay = S.my.registration ? (await api('/my/day')).days : [];
+  S.myQr = S.my.registration ? (await api('/my/qr')).qr : null;
   if (S.myQ.some((t) => ['waiting', 'called', 'testing', 'needs_committee'].includes(t.status))) startPoll(10000, repaint); else stopPoll();
   const m = S.my, c = m.competition;
   if (!c) return `<div class="card empty"><h2>لا توجد دورة حالية</h2></div>`;
@@ -211,6 +218,8 @@ async function vMy() {
   const active = r.entries.filter((e) => e.status === 'active'), old = r.entries.filter((e) => e.status !== 'active');
   return `<div class="head"><div><h1>مشاركتي</h1><p>${esc(c.name)} · الدورة ${esc(c.number)}</p></div>
     <div class="acts">${m.canEdit ? '<button class="btn pri" data-act="wz-edit">تعديل التسجيل</button>' : ''}${m.canWithdraw ? '<button class="btn badb" data-act="withdraw">الانسحاب من المسابقة</button>' : ''}</div></div>
+  ${S.myQr ? `<div class="card qrcard"><div class="qrimg">${S.myQr.svg}</div><div><h2>رمز الحضور</h2><p>اعرض هذا الرمز في الاستقبال يوم التصفيات وقبل النهائي والنهائي، فيُسجَّل حضورك بمسحه. يمكنك حفظ صورة للشاشة لاستخدامه دون إنترنت.</p>
+    <p class="note">${esc(m.person.fullName)}</p><div class="acts"><button class="btn sm" data-act="qr-big">تكبير الرمز</button></div></div></div>` : ''}
   <div class="grid2"><div class="card"><div class="status"><span class="big">${esc(r.statusName)}</span></div>
     <p class="note">سُجّلت ${esc(fmt(r.createdAt))}${r.updatedAt !== r.createdAt ? ' · آخر تحديث ' + esc(fmt(r.updatedAt)) : ''}</p>
     <h3>مشاركاتي (${active.length})</h3>
@@ -521,6 +530,7 @@ async function vReception() {
   };
   return `<div class="head"><div><h1>الاستقبال وتسجيل الحضور</h1><p>${esc(d.stageName)} · ${me.role === 'top' ? (f.section ? esc(meta.sections[f.section]) : 'القسمان') : esc(me.sectionName)} · الأسماء مرتبة أبجديًا، والدور في الطابور بحسب وقت تثبيت الحضور</p></div><div class="acts"><a class="btn" href="#queues">الطوابير</a></div></div>
   ${stageBar()}${S.stage !== 'prelim' ? `<div class="banner info">يظهر في ${esc(d.stageName)} المتأهلون بقرار معتمد فقط.</div>` : ''}
+  <div class="scanbar"><button class="btn pri" data-act="qr-scan">مسح رمز QR لتسجيل الحضور</button><span class="note">يُسجَّل حضور ${esc(d.stageName)} فور المسح. يعمل بكاميرا الجهاز أو بقارئ رموز موصول.</span></div>
   <div class="kpis"><div class="kpi main"><b>${c.persons || 0}</b><span>حاضرون</span></div><div class="kpi"><b>${c.waiting || 0}</b><span>في الانتظار</span></div><div class="kpi"><b>${c.active || 0}</b><span>نودوا أو جارٍ اختبارهم</span></div><div class="kpi"><b>${c.done || 0}</b><span>انتهى اختبارهم</span></div><div class="kpi"><b>${c.needs || 0}</b><span>بانتظار تحديد اللجنة</span></div></div>
   <div class="card"><form class="filters" data-form="recf" role="search"><input type="search" id="rf-q" value="${esc(f.q)}" placeholder="ابحث بالاسم أو الهوية أو الهاتف" aria-label="بحث" autofocus>
     ${me.role === 'top' ? `<select id="rf-section" aria-label="القسم">${opts(Object.entries(meta.sections), f.section, 'القسمان')}</select>` : ''}
@@ -899,6 +909,59 @@ async function vNotices() {
       <td><span class="tag ${x.status === 'sent' ? 'ok' : x.status === 'failed' ? 'bad' : 'warn'}">${esc(x.statusName)}</span>${x.error ? `<br><small class="note">${esc(x.error)}</small>` : ''}</td><td class="n">${x.attempts}</td><td>${x.status === 'failed' || x.status === 'skipped' ? `<button class="btn sm" data-act="resend" data-id="${x.id}">إعادة الإرسال</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>`;
 }
 
+// ---------- مسح رمز QR للحضور ----------
+const QRS = { stream: null, timer: null, last: '', lastAt: 0, busy: false, det: null };
+const qrResult = (r, err) => err ? `<div class="qres bad"><b>${esc(err)}</b></div>`
+  : `<div class="qres ${r.already ? 'warn' : 'ok'}"><b>${r.already ? 'سُجّل حضوره مسبقًا' : 'سُجّل الحضور'}: ${esc(r.name)}</b><span>${esc(r.sectionName)} · ${esc(r.category)} · ${esc(r.stageName)}</span>
+    ${r.tickets.map((t) => `<span>${esc(t.branchName)}${t.trackName ? ' · ' + esc(t.trackName) : ''} — رقم الوصول <b>${t.seq}</b>${t.committee ? ' · ' + esc(t.committee) : ' · يحتاج إسناد لجنة'}</span>`).join('')}
+    ${(r.warnings || []).map((w) => `<span class="w">⚠ ${esc(w)}</span>`).join('')}</div>`;
+async function qrSubmit(code) {
+  const out = $('#qr-out'); if (!out || QRS.busy) return;
+  const now = Date.now(); if (code === QRS.last && now - QRS.lastAt < 4000) return; // المسح المتكرر للرمز نفسه
+  QRS.last = code; QRS.lastAt = now; QRS.busy = true;
+  try { const r = await api('/checkin/qr', { method: 'POST', body: { code, stage: S.stage } }); out.innerHTML = qrResult(r) + out.innerHTML; if (!r.already) chime(); }
+  catch (e) { out.innerHTML = qrResult(null, e.message) + out.innerHTML; }
+  finally { QRS.busy = false; const kids = out.children; while (kids.length > 6) out.removeChild(kids[kids.length - 1]); }
+}
+function qrStop() { clearInterval(QRS.timer); QRS.timer = null; if (QRS.stream) QRS.stream.getTracks().forEach((t) => t.stop()); QRS.stream = null; }
+const loadJsQR = () => (window.jsQR ? Promise.resolve() : new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = '/vendor/jsqr.js'; sc.onload = ok; sc.onerror = () => no(new Error('تعذّر تحميل قارئ الرموز')); document.head.appendChild(sc); }));
+async function qrStart() {
+  const v = $('#qr-video'), msg = $('#qr-msg');
+  try {
+    QRS.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    v.srcObject = QRS.stream; await v.play();
+  } catch (e) { msg.textContent = 'تعذّر فتح الكاميرا (يلزم السماح للمتصفح باستخدامها). يمكنك استخدام قارئ رموز موصول أو كتابة الرمز في الخانة.'; return; }
+  let detect;
+  if ('BarcodeDetector' in window) { try { QRS.det = new window.BarcodeDetector({ formats: ['qr_code'] }); detect = async () => { const r = await QRS.det.detect(v); return r[0] && r[0].rawValue; }; } catch (e) { QRS.det = null; } }
+  if (!detect) {
+    try { await loadJsQR(); } catch (e) { msg.textContent = e.message; return; }
+    const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+    detect = async () => { if (!v.videoWidth) return null; const w = Math.min(640, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth); cv.width = w; cv.height = h; cx.drawImage(v, 0, 0, w, h); const r = window.jsQR(cx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' }); return r && r.data; };
+  }
+  msg.textContent = 'وجّه الكاميرا إلى رمز المتسابق.';
+  QRS.timer = setInterval(async () => { if (!$('#qr-video')) return qrStop(); try { const c = await detect(); if (c) qrSubmit(c); } catch (e) {} }, 250);
+}
+function openScanner() {
+  modal(`مسح رمز الحضور — ${STG.find((x) => x[0] === S.stage)[1]}`, `<div class="scanner"><video id="qr-video" playsinline muted></video><p class="note" id="qr-msg">جارٍ فتح الكاميرا…</p>
+    <form data-form="qrcode" class="row-in"><input id="qr-in" placeholder="أو امسح بقارئ موصول / اكتب الرمز" autocomplete="off" aria-label="الرمز"><button class="btn" type="submit">تسجيل</button></form>
+    <div id="qr-out" aria-live="polite"></div><div class="acts"><button class="btn" type="button" data-act="close">إنهاء المسح</button></div></div>`);
+  setTimeout(() => { const i = $('#qr-in'); if (i) i.focus(); }, 50);
+  qrStart();
+}
+dlg.addEventListener('close', () => { if (QRS.stream || QRS.timer) { qrStop(); if (view === 'reception') render(); } });
+async function vQrcheck() {
+  const st = S.qrStage || null;
+  let d; try { d = await api('/checkin/qr?code=' + encodeURIComponent(S.qrCode || '') + (st ? '&stage=' + st : '')); }
+  catch (e) { return `<div class="card empty"><h2>تعذّر قراءة الرمز</h2><p>${esc(e.message)}</p><div class="acts"><a class="btn" href="#reception">الاستقبال</a></div></div>`; }
+  S.qrStage = d.stage;
+  const all = d.entries.length && d.entries.every((e) => e.checkedIn);
+  return `<div class="head"><div><h1>تسجيل حضور بالرمز</h1><p>${esc(d.sectionName)} · ${esc(d.category)}</p></div></div>
+  <div class="card qrcheck"><h2>${esc(d.name)}</h2><p class="note">رقم الهوية ينتهي بـ ${esc(d.nationalIdTail)}</p>
+    <div class="field"><label for="qc-st">المرحلة</label><select id="qc-st" data-qcst>${opts(STG, d.stage)}</select></div>
+    ${d.entries.length ? `<ul class="plain">${d.entries.map((e) => `<li><b>${esc(e.branchName)}</b>${e.trackName ? ' · ' + esc(e.trackName) : ''} ${e.checkedIn ? `<span class="tag ok">حضر · رقم ${e.seq}</span>` : '<span class="tag">لم يحضر</span>'}${e.day ? ` <span class="tag ${e.day.today ? 'ok' : 'warn'}">${esc(e.day.name)} · ${esc(e.day.label)}${e.day.today ? '' : ' (ليس اليوم)'}</span>` : ''}</li>`).join('')}</ul>` : `<p class="banner warn">لا مشاركات تحتاج حضورًا في ${esc(d.stageName)}.</p>`}
+    <div class="acts">${d.entries.length && !all ? '<button class="btn pri" data-act="qc-go">تسجيل الحضور</button>' : ''}<a class="btn" href="#reception">الاستقبال</a></div><div id="qr-out"></div></div>`;
+}
+
 // ---------- توزيع المتسابقين على أيام التصفيات ----------
 const addDays = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
 function dplanFrom(d) {
@@ -1023,7 +1086,7 @@ async function vMaterials() {
     <p class="note">المذكرة لكل الفرع ما لم تخصصها بمقرر أو فئة. «المتأهلون إلى…» تجعلها لمن تأهل إلى تلك المرحلة فقط، مثل مقاطع النهائي.${me.role === 'exec' ? ' تُرفع لقسمك؛ المذكرة المشتركة للقسمين ترفعها الإدارة العليا.' : ''}</p></div>` : ''}</div>`;
 }
 
-const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults, tests: vTests, inbox: vInbox, schedule: vSchedule, notices: vNotices, materials: vMaterials, draws: vDraws, days: vDays };
+const VIEWS = { home: vHome, login: vLogin, signup: vSignup, account: vAccount, space: vSpace, my: vMy, regs: vRegs, dash: vDash, setup: vSettings, users: vUsers, audit: vAudit, reception: vReception, queues: vQueues, committees: vCommittees, screen: vScreen, grade: vGrade, results: vResults, tests: vTests, inbox: vInbox, schedule: vSchedule, notices: vNotices, materials: vMaterials, draws: vDraws, days: vDays, qrcheck: vQrcheck };
 
 // ---------- الأحداث ----------
 const val = (id) => (document.getElementById(id) || {}).value || '';
@@ -1086,6 +1149,9 @@ document.addEventListener('click', async (e) => {
       if (a === 'dr-draw') await new Promise((ok) => setTimeout(ok, 600));
       toast(a === 'dr-ok' ? 'اعتُمد مقطعك' : `ظهر لك: ${r.state.current.label}`); render();
     }
+    else if (a === 'qr-scan') openScanner();
+    else if (a === 'qr-big') modal('رمز الحضور', `<div class="qrbig">${S.myQr.svg}</div><p class="note" style="text-align:center">${esc(S.my.person.fullName)}</p>`);
+    else if (a === 'qc-go') { b.disabled = true; try { const r = await api('/checkin/qr', { method: 'POST', body: { code: S.qrCode, stage: S.qrStage } }); chime(); await render(); $('#qr-out').innerHTML = qrResult(r); } finally { b.disabled = false; } }
     else if (a === 'daysec') { S.dsec = b.dataset.s; S.dplanDirty = false; S.dpeople = null; render(); }
     else if (a === 'dp-even') {
       const P = S.dplan;
@@ -1202,6 +1268,7 @@ function specToggle() { const r = $('#u-r'); if (!r) return; $('#u-spec-f').hidd
 document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'u-r') specToggle();
+  if (t.dataset.qcst !== undefined) { S.qrStage = t.value; render(); }
   if (t.dataset.dn !== undefined && S.dplan) {
     const n = Math.min(14, Math.max(1, parseInt(t.value, 10) || 1)), P = S.dplan;
     for (let i = P.dates.length; i < n; i++) P.dates[i] = P.dates[i - 1] ? addDays(P.dates[i - 1], 1) : '';
@@ -1251,7 +1318,7 @@ document.addEventListener('submit', async (e) => {
   const box = f.querySelector('.err') || (dlg.open ? $('#dlg-b .err') : null); if (box) box.hidden = true;
   const btn = f.querySelector('[type=submit]'); if (busy) return; busy = true; if (btn) btn.disabled = true;
   try {
-    if (k === 'login') { const r = await api('/login', { method: 'POST', body: { login: val('l-login'), password: val('l-pass') } }); me = r.user; go(homeOf()); pollUnread(); }
+    if (k === 'login') { const r = await api('/login', { method: 'POST', body: { login: val('l-login'), password: val('l-pass') } }); me = r.user; let nx = null; try { nx = sessionStorage.getItem('iqraNext'); sessionStorage.removeItem('iqraNext'); } catch (e) {} if (nx) location.hash = nx; else go(homeOf()); pollUnread(); }
     else if (k === 'signup') {
       if (val('s-pass') !== val('s-pass2')) throw new Error('كلمتا المرور غير متطابقتين');
       const r = await api('/signup', { method: 'POST', body: { nationalId: val('s-id'), fullName: val('s-name'), phone: val('s-phone'), email: val('s-email'), password: val('s-pass') } });
@@ -1270,6 +1337,7 @@ document.addEventListener('submit', async (e) => {
       const r = await api('/sessions', { method: 'POST', body }); toast(`حُفظ الموعد، وأُشعر ${r.notified} متسابقًا`); render();
     }
     else if (k === 'session-edit') { const r = await api('/sessions/' + f.dataset.id, { method: 'PUT', body: { ...whenBody('se'), location: val('se-loc'), note: val('se-note') } }); closeModal(); toast(r.notified ? `حُفظ التعديل، وأُشعر ${r.notified} متسابقًا` : 'لا تغيير'); render(); }
+    else if (k === 'qrcode') { const i = $('#qr-in'), v = i.value.trim(); i.value = ''; if (v) await qrSubmit(v); i.focus(); }
     else if (k === 'dplan') {
       const P = S.dplan, days = Array.from({ length: P.n }, (_, i) => ({ date: P.dates[i] || '' }));
       if (days.some((x) => !x.date)) throw new Error('أدخل تاريخ كل يوم');

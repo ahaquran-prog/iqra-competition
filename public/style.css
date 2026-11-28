@@ -439,3 +439,15 @@ table.caps tr.sum td{border-top:2px solid var(--line);font-weight:700}
 .qs li.qsec{list-style:none;margin:18px 0 6px}.qs li.qsec h2{margin:0;font-size:20px;color:var(--copper)}
 
 tr.top10 td{background:rgba(197,155,85,.09)}tr.top10 td:first-child{box-shadow:inset -4px 0 0 var(--gold)}
+
+/* رمز الحضور ومسحه */
+.qrcard{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.qrimg{background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;width:180px;line-height:0}.qrimg svg,.qrbig svg{width:100%;height:auto;display:block}
+.qrbig{background:#fff;width:min(78vw,420px);margin:0 auto;line-height:0}
+.scanbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+.scanner video{width:100%;max-height:52vh;background:#000;border-radius:12px;object-fit:cover}
+.row-in{display:flex;gap:8px;margin:8px 0}.row-in input{flex:1}
+.qres{display:flex;flex-direction:column;gap:3px;border-radius:10px;padding:10px 14px;margin:8px 0;border:1px solid var(--line)}
+.qres.ok{background:#e9f6ee;border-color:#9fd3b0}.qres.warn{background:#fff6e5;border-color:#efcf8a}.qres.bad{background:#fdecec;border-color:#efb1b1}
+.qres .w{color:#8a5a00}
+.qrcard>div:last-child{flex:1 1 260px;min-width:0}.qrcard h2{margin-top:0}
