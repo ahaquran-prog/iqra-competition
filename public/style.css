@@ -437,3 +437,5 @@ table.caps tr.sum td{border-top:2px solid var(--line);font-weight:700}
 .ent .day{display:inline-block;margin-inline-start:6px}
 
 .qs li.qsec{list-style:none;margin:18px 0 6px}.qs li.qsec h2{margin:0;font-size:20px;color:var(--copper)}
+
+tr.top10 td{background:rgba(197,155,85,.09)}tr.top10 td:first-child{box-shadow:inset -4px 0 0 var(--gold)}

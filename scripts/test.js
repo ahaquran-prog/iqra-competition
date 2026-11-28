@@ -640,12 +640,29 @@ function client(base) {
     ok('رئيس التحكيم يرى الدرجة (درجتان لكل سؤال) وزمن الحل والترتيب', r.data.rows[0].score === 2 && r.data.rows[0].max === 4 && r.data.rows[0].rank === 1 && r.data.rows[0].seconds >= 0);
     r = await execM('GET', `/api/tests/${T.id}/results`);
     ok('التنفيذية ترى «أُنجز» دون الدرجة', r.status === 200 && r.data.rows[0].status === 'submitted' && r.data.rows[0].score === undefined);
+    {
+      // التمايز: الدرجة أولًا، وعند التساوي الأسرع تسليمًا، والمراكز لكل قسم
+      const pid = (nid) => db.prepare('SELECT id FROM people WHERE national_id=?').get(nid).id;
+      const anyEntry = (nid) => db.prepare('SELECT e.id FROM entries e JOIN registrations r ON r.id=e.registration_id WHERE r.person_id=? LIMIT 1').get(pid(nid)).id;
+      const base0 = Date.now() - 3600e3, ins = db.prepare("INSERT INTO test_attempts(test_id,entry_id,person_id,section,question_ids,answers,started_at,deadline,submitted_at,score,max,status) VALUES (?,?,?,?,',',?,?,?,?,?,4,'submitted')");
+      ins.run(T.id, anyEntry('2000000001'), pid('2000000001'), 'M', '{}', base0, base0 + 600e3, base0 + 300e3, 2);   // درجة 2 في 5 دقائق
+      ins.run(T.id, anyEntry('2000000002'), pid('2000000002'), 'M', '{}', base0, base0 + 600e3, base0 + 120500, 2);  // درجة 2 في دقيقتين ونصف ثانية
+      ins.run(T.id, anyEntry('2000000003'), pid('2000000003'), 'M', '{}', base0, base0 + 600e3, base0 + 120400, 4);  // الأعلى درجة
+      const sara0 = db.prepare("SELECT p.id, (SELECT e.id FROM entries e JOIN registrations r ON r.id=e.registration_id WHERE r.person_id=p.id LIMIT 1) e FROM people p JOIN registrations r ON r.person_id=p.id WHERE r.section='F' LIMIT 1").get();
+      ins.run(T.id, sara0.e, sara0.id, 'F', '{}', base0, base0 + 600e3, base0 + 60e3, 1);
+      const rs = (await admin('GET', `/api/tests/${T.id}/results`)).data.rows, rk = (n) => rs.find((x) => x.name.startsWith(n));
+      ok('المركز الأول للأعلى درجة', rk('ثامر').rank === 1);
+      ok('عند تساوي الدرجة يتقدم الأسرع تسليمًا (ولو بفارق جزء من الثانية)', rk('حسن').rank === 2 && rk('زياد').rank === 3 && rk('بلال').rank === 4 && rk('زياد').tie && !rk('زياد').tieExact, rs.map((x) => [x.name.split(' ')[0], x.rank, x.score, x.ms]));
+      ok('المراكز لكل قسم على حدة', rs.find((x) => x.section === 'F').rank === 1);
+      const cx = (await admin('GET', `/api/tests/${T.id}/results.xlsx`)).data, X = require('../lib/xlsx').read(cx);
+      ok('تنزيل النتائج Excel بالمركز والدرجة والزمن', X[0][0] === 'المركز' && X[1][0] === 1 + '' && X.some((x) => x[7] && x[7].includes('التمايز بالزمن')));
+    }
     r = await admin('POST', `/api/tests/${T.id}/publish`, {});
     ok('لا تُنشر النتائج قبل إغلاق الاختبار', r.status === 409);
     await admin('PUT', `/api/tests/${T.id}`, { ...T, status: 'closed' });
     await admin('POST', `/api/tests/${T.id}/publish`, {});
     r = await c6('GET', '/api/my/tests');
-    ok('بعد النشر يرى المتسابق درجته', r.data.tests[0].result && r.data.tests[0].result.score === 2);
+    ok('بعد النشر يرى المتسابق درجته ومركزه في قسمه', r.data.tests[0].result && r.data.tests[0].result.score === 2 && r.data.tests[0].result.rank >= 1 && r.data.tests[0].result.count === 4, r.data.tests[0].result);
     // انتهاء الوقت: إرسال آلي بزمن الخادم
     await admin('PUT', `/api/tests/${T2.id}`, { ...T2, status: 'draft' });
     const tq = (await admin('POST', `/api/tests/${T2.id}/questions`, { type: 'tf', text: 'سورة ق مكية', correct: 0 })).data.id;
