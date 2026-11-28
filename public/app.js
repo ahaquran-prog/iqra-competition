@@ -76,7 +76,7 @@ addEventListener('hashchange', route);
 const LOGO = '<img src="/emblem-light.png" alt="">', LOGO_C = '<img src="/emblem-color.png" alt="">';
 function wordmark(c, big) {
   const n = c ? c.number : '', y = c ? String(c.year || '') : '';
-  return `<span class="wm${big ? ' big' : ''}"><span class="wm-t"><small>مسابقة</small><b>اقرأ القرآنية</b></span>${n ? `<span class="wm-n">${esc(n)}</span>` : ''}${y ? `<span class="wm-y">${esc(y)}</span>` : ''}</span>`;
+  return `<span class="wm${big ? ' big' : ''}"><span class="wm-t"><small>مسابقة</small><b>اقرأ القرآنية</b></span>${n ? `<span class="wm-n">${esc(n)}</span>` : ''}${y ? `<span class="wm-y" aria-label="${esc(y)}">${[...y].map((d) => `<span>${esc(d)}</span>`).join('')}</span>` : ''}</span>`;
 }
 function shell() {
   const br = $('#brand'); if (br && !br.dataset.done && pub) { br.innerHTML = `<span class="emb">${LOGO}</span>${wordmark(pub.competition)}`; br.dataset.done = '1'; }
