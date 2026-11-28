@@ -546,9 +546,9 @@ async function vReception() {
   const c = d.counts, pages = Math.max(1, Math.ceil(d.total / d.pageSize));
   const row = (r) => {
     const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
-    const quick = el.length && el.every((e) => e.candidates.length === 1);
+    const quick = el.length && el.every((e) => e.candidates.length);
     return `<tr><td><b>${esc(r.name)}</b>${me.role === 'top' ? `<br><small class="note">${esc(r.sectionName)}</small>` : ''}</td><td>${esc(r.category)}</td>
-    <td><div class="chips">${r.entries.map((e) => `<span class="ent"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${e.day ? ` <span class="tag ${e.day.today ? 'ok' : 'warn'} day">${esc(e.day.name)} · ${esc(e.day.label)}${e.day.today ? '' : ' (ليس اليوم)'}</span>` : ''} ${!e.needsCommittee ? '<span class="tag">اختبار إلكتروني</span>' : e.ticket && e.ticket.status !== 'cancelled' ? tTag(e.ticket) + (['waiting', 'needs_committee', 'no_show'].includes(e.ticket.status) ? ` <button class="btn link" data-act="tk-cancel" data-id="${e.ticket.id}">إلغاء</button>` : '') : '<span class="tag">لم يحضر</span>'}</span>`).join('')}</div></td>
+    <td><div class="chips">${r.entries.map((e) => `<span class="ent"><b>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</b>${e.day ? ` <span class="tag ${e.day.today ? 'ok' : 'warn'} day">${esc(e.day.name)} · ${esc(e.day.label)}${e.day.today ? '' : ' (ليس اليوم)'}</span>` : ''} ${!e.needsCommittee ? '<span class="tag">اختبار إلكتروني</span>' : e.ticket && e.ticket.status !== 'cancelled' ? tTag(e.ticket) + (e.ticket.status === 'needs_committee' && e.candidates.length ? ` <button class="btn sm pri" data-act="tk-assign" data-id="${e.ticket.id}" data-c="${e.candidates[0].id}">إلى ${esc(e.candidates[0].name)}</button>` : '') + (['waiting', 'needs_committee', 'no_show'].includes(e.ticket.status) ? ` <button class="btn link" data-act="tk-cancel" data-id="${e.ticket.id}">إلغاء</button>` : '') : '<span class="tag">لم يحضر</span>'}</span>`).join('')}</div></td>
     <td>${el.length ? `<button class="btn ${quick ? 'pri' : ''} sm" data-act="${quick ? 'ci-quick' : 'ci-open'}" data-id="${r.id}">${quick ? 'تثبيت الحضور' : 'تسجيل الحضور…'}</button>${quick && el.length > 1 ? ` <button class="btn link" data-act="ci-open" data-id="${r.id}">اختيار</button>` : ''}` : '<span class="tag ok">حاضر</span>'}</td></tr>`;
   };
   return `<div class="head"><div><h1>الاستقبال وتسجيل الحضور</h1><p>${esc(d.stageName)} · ${me.role === 'top' ? (f.section ? esc(meta.sections[f.section]) : 'القسمان') : esc(me.sectionName)} · الأسماء مرتبة أبجديًا، والدور في الطابور بحسب وقت تثبيت الحضور</p></div><div class="acts"><a class="btn" href="#queues">الطوابير</a></div></div>
@@ -569,7 +569,7 @@ function checkinForm(r) {
   const el = r.entries.filter((e) => e.needsCommittee && (!e.ticket || e.ticket.status === 'cancelled'));
   modal('تسجيل حضور ' + r.name, `<p class="note">اختر المشاركات التي يحضرها اليوم. حضور الحفظ لا يعني حضور التلاوة تلقائيًا.</p><form data-form="checkin" data-id="${r.id}"><p class="err" hidden></p>
   ${el.map((e) => `<div class="pick on"><label class="check"><input type="checkbox" name="e" value="${e.id}" checked>${esc(e.branchName)}${e.trackName ? ' · ' + esc(e.trackName) : ''}</label>
-    ${e.candidates.length > 1 ? `<div class="field"><label>اللجنة</label><select name="c-${e.id}">${opts(e.candidates.map((x) => [x.id, x.name + (x.hall ? ' — ' + x.hall : '')]), '', 'اختر اللجنة…')}</select></div>`
+    ${e.candidates.length > 1 ? `<div class="field"><label>اللجنة</label><select name="c-${e.id}">${opts(e.candidates.map((x, i) => [x.id, x.name + (x.hall ? ' — ' + x.hall : '') + (i ? '' : ' (المخصصة)')]), e.candidates[0].id)}</select><small>اختيرت تلقائيًا اللجنة المخصصة لفئته ومقرره؛ غيّرها عند الحاجة فقط.</small></div>`
       : e.candidates.length ? `<p class="note">اللجنة: ${esc(e.candidates[0].name)}${e.candidates[0].hall ? ' — ' + esc(e.candidates[0].hall) : ''}</p>` : '<p class="err">لا توجد لجنة مطابقة؛ يُسجَّل حضوره «بانتظار تحديد اللجنة».</p>'}</div>`).join('')}
   <div class="acts"><button class="btn pri" type="submit">تثبيت الحضور</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form>`);
 }
@@ -601,7 +601,7 @@ async function vQueues() {
     <div class="acts">${me.role === 'top' ? [['', 'القسمان'], ['M', 'الرجال'], ['F', 'النساء']].map(([k, n]) => `<button class="btn sm ${q.section === k ? 'pri' : ''}" data-act="qsec" data-s="${k}">${n}</button>`).join('') : ''}${['exec', 'chief', 'top'].includes(me.role) ? '<a class="btn sm" href="#screen">شاشة الانتظار</a>' : ''}</div></div>
   ${stageBar()}
   ${d.needsCommittee.length ? `<div class="card warnbox"><h3>بانتظار تحديد اللجنة (${d.needsCommittee.length})</h3>${d.needsCommittee.map((t) => `<div class="acts needs"><span><b>${esc(t.name)}</b> · ${esc(t.branchName)}${t.trackName ? ' · ' + esc(t.trackName) : ''} · ${esc(t.category)} · #${t.seq}</span>
-    ${t.candidates.length ? `<select id="as-${t.id}" aria-label="اللجنة">${opts(t.candidates.map((x) => [x.id, x.name]), '', 'اختر اللجنة…')}</select><button class="btn sm pri" data-act="tk-assign" data-id="${t.id}">إسناد</button>` : '<span class="tag bad">لا توجد لجنة مطابقة: أنشئ لجنة من «اللجان»</span>'}</div>`).join('')}</div>` : ''}
+    ${t.candidates.length ? `<select id="as-${t.id}" aria-label="اللجنة">${opts(t.candidates.map((x) => [x.id, x.name]), t.candidates[0].id)}</select><button class="btn sm pri" data-act="tk-assign" data-id="${t.id}">إسناد</button>` : '<span class="tag bad">لا توجد لجنة مطابقة: أنشئ لجنة من «اللجان»</span>'}</div>`).join('')}</div>` : ''}
   ${d.committees.length ? `<div class="qgrid">${d.committees.map(card).join('')}</div>` : `<div class="card empty"><p>${['judge', 'coordinator'].includes(me.role) ? 'لم تُكلَّف بلجنة بعد.' : 'لا توجد لجان نشطة.'}</p></div>`}`;
 }
 
@@ -1271,7 +1271,7 @@ document.addEventListener('click', async (e) => {
         toast(a === 'q-next' ? 'نودي: ' + r.ticket.name : r.ticket.name + ': ' + r.ticket.statusName); await repaint();
       } catch (err) { toast(err.message); await repaint(); } finally { busy = false; }
     }
-    else if (a === 'tk-assign') { const v = val('as-' + id); if (!v) return toast('اختر اللجنة'); await api(`/tickets/${id}/assign`, { method: 'POST', body: { committeeId: v } }); toast('أُسند إلى اللجنة'); repaint(); }
+    else if (a === 'tk-assign') { const v = b.dataset.c || val('as-' + id); if (!v) return toast('اختر اللجنة'); await api(`/tickets/${id}/assign`, { method: 'POST', body: { committeeId: v } }); toast('أُسند إلى اللجنة'); repaint(); }
     // اللجان
     else if (a === 'cmsec') { S.cm.section = b.dataset.s; render(); }
     else if (a === 'cm-new') committeeForm(null);
